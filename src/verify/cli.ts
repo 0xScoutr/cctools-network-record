@@ -108,12 +108,13 @@ const PARTS: Record<Check["part"], string> = {
   files: "1. Published files and their sha256",
   render: "2. Rendered again from the published rows",
   scan: "3. Re-derived from Scan",
+  supply: "4. Supply: from the published files, which Scan cannot serve again for a past day",
 };
 
 function print(report: VerifyReport, offline: boolean): void {
   console.log(`\nCCTools daily record of the Canton Network: verify ${report.date}${offline ? " (offline, recorded answers)" : ""}`);
   console.log(`files from ${report.origin}${report.generation ? `, generation ${report.generation}` : ""}`);
-  for (const part of ["files", "render", "scan"] as const) {
+  for (const part of ["files", "render", "scan", "supply"] as const) {
     const rows = report.checks.filter((c) => c.part === part);
     if (rows.length === 0) continue;
     console.log(`\n${PARTS[part]}`);

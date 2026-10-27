@@ -9,7 +9,12 @@
  *              for byte the published ones, so the published bytes come from
  *              this code and those rows;
  *   scan       the day's values re-derived from Scan (derive.ts) equal the
- *              published ones, value by value.
+ *              published ones, value by value;
+ *   supply     what Scan cannot serve again for a past day: supply_cc, taken
+ *              from the published file as an input, and net_supply_change_cc,
+ *              recomputed from the published supply_cc of D and D-1. Both
+ *              are reported apart from the Scan part, so its count is only
+ *              of values re-derived from Scan.
  *
  * A check is `ok`, `fail`, `warn` (a difference that is not in the data: a
  * documentation file rendered by an older text, a value Scan cannot serve
@@ -48,7 +53,7 @@ import { gapRows, revisionRows, valueRows, type PublishedFile, type PublishedSou
 export type CheckStatus = "ok" | "fail" | "warn" | "info";
 
 export interface Check {
-  part: "files" | "render" | "scan";
+  part: "files" | "render" | "scan" | "supply";
   name: string;
   status: CheckStatus;
   detail: string;
@@ -67,6 +72,8 @@ export interface VerifyReport {
 const DOCUMENTATION_FILES = new Set(["methodology.json", "datapackage.json"]);
 /** Series Scan cannot serve again for a past day: the registry serves only the current supply. */
 const INPUT_SERIES = new Set<SeriesName>(["supply_cc"]);
+/** Series recomputed from published inputs only (supply_cc of D and D-1), never read from Scan. */
+const FROM_INPUTS = new Set<SeriesName>(["net_supply_change_cc"]);
 
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 const short = (hex: string) => hex.slice(0, 12);
@@ -202,26 +209,28 @@ export async function verifyDay(opts: {
       const pub = day.values[s];
       const c = derived.series[s];
       const pubText = pub?.value == null ? null : String(pub.value);
+      const part: Check["part"] = INPUT_SERIES.has(s) || FROM_INPUTS.has(s) ? "supply" : "scan";
+      const verb = FROM_INPUTS.has(s) ? "recomputed" : "re-derived";
       if (INPUT_SERIES.has(s)) {
-        add("scan", s, "info", `${pubText ?? "empty"}: taken from the published file as an input; Scan's registry serves only the current supply`);
+        add(part, s, "info", `${pubText ?? "empty"}: taken from the published file as an input; Scan's registry serves only the current supply`);
         continue;
       }
       if (pubText == null) {
         const why = pub?.gap ? `${pub.gap.reason_code}: ${pub.gap.reason}` : "no value";
-        add("scan", s, "info", `published empty (${why}); re-derived ${c.value ?? `empty (${c.gap?.reason_code})`}`);
+        add(part, s, "info", `published empty (${why}); ${verb} ${c.value ?? `empty (${c.gap?.reason_code})`}`);
         continue;
       }
       if (c.value == null) {
-        add("scan", s, "fail", `published ${pubText}; not re-derived (${c.gap?.reason_code}: ${c.gap?.reason})`);
+        add(part, s, "fail", `published ${pubText}; not ${verb} (${c.gap?.reason_code}: ${c.gap?.reason})`);
         continue;
       }
       const same = sameFinalValue(pubText, c.value);
       const asOfSame = pub?.as_of == null || isoZ(c.as_of) === pub.as_of;
       const held = c.hold ? `; held by a gate here: ${c.hold}` : "";
-      const derivedNote = s === "net_supply_change_cc" ? " (from the published supply_cc of D and D-1)" : "";
-      if (same && asOfSame) add("scan", s, c.hold ? "warn" : "ok", `${pubText}${derivedNote}${held}`);
-      else if (same) add("scan", s, "fail", `${pubText}, but as_of ${isoZ(c.as_of)} here and ${pub?.as_of} published`);
-      else add("scan", s, "fail", `published ${pubText}, re-derived ${c.value}${held}`);
+      const note = FROM_INPUTS.has(s) ? " (the published supply_cc of D minus that of D-1, not read from Scan)" : "";
+      if (same && asOfSame) add(part, s, c.hold ? "warn" : "ok", `${pubText}${note}${held}`);
+      else if (same) add(part, s, "fail", `${pubText}, but as_of ${isoZ(c.as_of)} here and ${pub?.as_of} published`);
+      else add(part, s, "fail", `published ${pubText}, ${verb} ${c.value}${held}`);
     }
     for (const w of derived.warnings) add("scan", "note", "info", w);
   }

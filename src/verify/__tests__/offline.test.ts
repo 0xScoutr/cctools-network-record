@@ -47,10 +47,16 @@ describe("the offline verify of the recorded day", () => {
     for (const part of ["files", "render"] as const) {
       for (const c of report.checks.filter((x) => x.part === part && x.name !== "methodology.json")) expect(c.status, c.name).toBe("ok");
     }
-    for (const s of SERIES_NAMES) {
-      const c = report.checks.find((x) => x.part === "scan" && x.name === s);
-      expect(c?.status, s).toBe(s === "supply_cc" ? "info" : "ok");
-    }
+    // Every value Scan can serve again is re-derived from it; the two supply
+    // series are reported apart, as inputs (supply_cc) and arithmetic on them.
+    const supply = ["supply_cc", "net_supply_change_cc"];
+    const scan = report.checks.filter((x) => x.part === "scan" && (SERIES_NAMES as readonly string[]).includes(x.name));
+    expect(scan.map((c) => c.name).sort()).toEqual(SERIES_NAMES.filter((s) => !supply.includes(s)).sort());
+    for (const c of scan) expect(c.status, c.name).toBe("ok");
+    expect(report.checks.filter((x) => x.part === "supply").map((c) => [c.name, c.status])).toEqual([
+      ["supply_cc", "info"],
+      ["net_supply_change_cc", "ok"],
+    ]);
   });
 
   it("fails a day file whose value was changed after it was served", async () => {

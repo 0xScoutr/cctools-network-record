@@ -107,7 +107,8 @@ The command reads the published files and checks three things:
 Scan's registry serves only the current supply, so a past day's `supply_cc`
 cannot be read again: the command takes it from the published file and says
 so, and `net_supply_change_cc` is recomputed from the published supply of D
-and D-1.
+and D-1. The report lists both in a fourth section of their own, so the Scan
+section counts only values re-derived from Scan.
 
 The default Scan host is `https://api.cantonnodes.com`, the public host the
 record reads (it is named on every value). It rate limits per client IP, so
