@@ -165,10 +165,10 @@ file's sha256 against `status.json` and renders every file again from the
 published rows with this package's code. With `--strict` a warning fails
 too, the prose of `methodology.json` and `datapackage.json` included: the
 day's last render (about 02:40 UTC, before the D+1 03:00 promise) is over
-three hours old by 06:17, longer than the edge serves a copy (an hour, and
-another hour stale while it revalidates, unless the origin is failing), so a
-difference means the deployment rendered with code other than this
-package's.
+three hours old by 06:17, longer than the files' Cache-Control lets an edge
+serve a copy (an hour, and another hour stale while it revalidates, unless
+the origin is failing), so a difference means the deployment rendered with
+code other than this package's.
 
 What it covers: everything `src/open-record/` renders from the published
 rows, on the data the record holds that day. What it does not cover: the

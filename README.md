@@ -72,9 +72,9 @@ A day is a UTC day D: `[D 00:00:00Z, D+1 00:00:00Z)`.
   while it was current keeps `supply_cc` empty, with its reason.
 
 The collectors write raw inputs only (`network_record_rounds`,
-`network_record_snapshots`, `network_record_supply`). `finalize.ts` is the single writer of the
-published values: a value is provisional until D+1 02:00 UTC, then final, and
-the day is promised final by D+1 03:00 UTC. A value that fails a sanity gate
+`network_record_snapshots`, `network_record_supply`). `finalize.ts` is the
+single writer of the published values: a value is provisional until D+1 02:00
+UTC, then final, and the day is promised final by D+1 03:00 UTC. A value that fails a sanity gate
 (a round count outside 120 to 160, rounds that do not follow the previous day,
 a count that moves more than 20% in a day, a round whose split does not add up)
 is held provisional and alarmed, never published as a confident number. An
@@ -114,8 +114,8 @@ The command reads the published files and checks three things:
 Scan's registry serves only the current supply, so a past day's `supply_cc`
 cannot be read again: the command takes it from the published file and says
 so, and `net_supply_change_cc` is recomputed from the published supply of D
-and D-1. The report lists both in a fourth section of their own, so the Scan
-section counts only values re-derived from Scan.
+and D-1. The report lists both in a section of their own after the Scan
+section, so the Scan section counts only values re-derived from Scan.
 
 The default Scan host is `https://api.cantonnodes.com`, the public host the
 record reads (it is named on every value). It rate limits per client IP, so
@@ -126,9 +126,9 @@ run takes at least 72 minutes at the default spacing. The default comes from
 the run that recorded 2026-10-25: at the earlier spacing of 6.5 s, its 215
 requests needed 23 minutes of spacing but took 76 minutes (about 2.8 a
 minute), so about 53 minutes went to waiting out 429s. That rate was measured
-on that run; the host publishes no limit. Any other Scan that serves the Splice Scan
-API can be named with `--scan-host`, with a shorter `--spacing-ms` if it
-allows more.
+on that run; the host publishes no limit. Any other Scan that serves the
+Splice Scan API can be named with `--scan-host`, with a shorter
+`--spacing-ms` if it allows more.
 
 ### Offline
 
