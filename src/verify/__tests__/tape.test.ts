@@ -132,7 +132,7 @@ describe("reduceAcsPage", () => {
     expect(reduceAcsPage({ templates: ["splice-amulet:Splice.Round:OpenMiningRound"] }, page)).toBeNull();
   });
 
-  it("leaves no e-mail address and no validator or app operator party in the recorded tape", () => {
+  it("leaves no e-mail address in the recorded tape and no validator or app operator party on its counted pages", () => {
     const tape = readFileSync(join(process.cwd(), "fixtures", "verify", "2026-10-25", "scan-tape.jsonl"), "utf-8");
     expect(tape.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g)).toBeNull();
     for (const line of tape.split(/\r?\n/).filter(Boolean)) {

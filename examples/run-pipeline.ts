@@ -1,6 +1,8 @@
 // One pass of the record's jobs against a local Postgres: the schema, the
 // round collector, the supply collector, finalize, and the render into out/.
-// Run it from the repository root, on the schedule the README gives:
+// Run it from the repository root. On a schedule, never let two runs overlap:
+// the module locks are the caller's and this example takes none, so wrap it
+// in flock or a similar lock, since both runs would open .record-db/:
 //
 //   pnpm exec tsx examples/run-pipeline.ts
 //

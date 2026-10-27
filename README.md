@@ -2,6 +2,10 @@
 
 The code that produces the **CCTools daily record of the Canton Network**, and a
 `verify` command that lets anyone check a published day against public Scan.
+CCTools runs its own copy of these modules in its deployment, kept in step
+with this package by the checks in [docs/drift-check.md](docs/drift-check.md)
+(one of them not applied yet), which also says what those checks do not
+prove.
 
 The record is one row per UTC day of network state: mining rounds, issuance by
 category, supply, the Super Validators' reference price, Super Validators,
@@ -122,7 +126,7 @@ record reads (it is named on every value). It rate limits per client IP, so
 the command spaces its requests (`--spacing-ms`, default 20000, 20 s) and
 waits out a 429. Re-deriving one day takes about 215 requests (for
 2026-10-25: the migration id, 8 ACS pages and 206 `/v2/updates` pages), so a
-run takes at least 72 minutes at the default spacing. The default comes from
+run takes at least 71 minutes at the default spacing (214 intervals of 20 s). The default comes from
 the run that recorded 2026-10-25: at the earlier spacing of 6.5 s, its 215
 requests needed 23 minutes of spacing but took 76 minutes (about 2.8 a
 minute), so about 53 minutes went to waiting out 429s. That rate was measured
@@ -180,7 +184,9 @@ with `pnpm exec tsx examples/run-pipeline.ts`:
 ```ts
 // One pass of the record's jobs against a local Postgres: the schema, the
 // round collector, the supply collector, finalize, and the render into out/.
-// Run it from the repository root, on the schedule the README gives:
+// Run it from the repository root. On a schedule, never let two runs overlap:
+// the module locks are the caller's and this example takes none, so wrap it
+// in flock or a similar lock, since both runs would open .record-db/:
 //
 //   pnpm exec tsx examples/run-pipeline.ts
 //

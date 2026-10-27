@@ -16,8 +16,11 @@
  * failure rules and health latch. The seams: the fetch and User-Agent come
  * from runtime/scan-settings.ts; the registry base defaults to the first Scan
  * host's /registry/metadata/v1 instead of a row of the deployment's asset
- * table; a reading is stored through SupplyWriter instead of the deployment's
- * asset tables, and a failed read is reported to the health latch and the
+ * table (that default fits api.cantonnodes.com; a Scan whose API sits under
+ * /api/scan, as a Super Validator's own does, serves the registry elsewhere,
+ * so set registryBaseUrl there); the health latch key and the cache tag are
+ * the package's own (network-record-supply); a reading is stored through
+ * SupplyWriter instead of the deployment's asset tables, and a failed read is reported to the health latch and the
  * result, not to a per-asset failure counter.
  *
  * Three things the registry does that this code relies on knowing:

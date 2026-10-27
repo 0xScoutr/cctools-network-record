@@ -60,8 +60,8 @@ function isAbort(err: unknown): boolean {
  * was recorded (215 requests in 76 minutes, about 2.8 a minute, most of the
  * time beyond the 6.5 s spacing then used spent waiting out 429s). Measured on
  * that run; the host publishes no limit. At this spacing a day of about 215
- * requests takes at least 72 minutes, about what the throttled run took, and
- * asks the host's free tier for nothing it refuses.
+ * requests takes at least 71 minutes (214 intervals of 20 s), about what the
+ * throttled run took. A run at 20 s has not been measured.
  */
 export const DEFAULT_SPACING_MS = 20_000;
 

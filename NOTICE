@@ -1,9 +1,10 @@
 cctools-network-record
 Copyright 2026 CCTools (https://cctools.network)
 
-This product includes software developed by CCTools: the pipeline that
-produces the CCTools daily record of the Canton Network. The code is
-licensed under the Apache License, Version 2.0 (see LICENSE).
+This product includes software developed by CCTools: a published copy of
+the pipeline that produces the CCTools daily record of the Canton Network.
+CCTools runs its own copy, kept in step as docs/drift-check.md describes.
+The code is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 The published record itself (https://api.cctools.network/api/open/network-record/v1/)
 is licensed separately under Creative Commons Attribution 4.0 International

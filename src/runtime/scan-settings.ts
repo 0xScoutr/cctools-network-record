@@ -5,8 +5,8 @@
  *              https URLs), then to the default public host in scan-client.ts;
  *   userAgent  falls back to the package's own;
  *   fetch      falls back to the global fetch, looked up at call time.
- * The verify CLI sets all three: its hosts, a paced fetch, and, offline, a
- * fetch that replays a recorded tape.
+ * The verify CLI sets two of them: its hosts and a paced fetch (offline, a
+ * fetch that replays a recorded tape); the User-Agent stays the package's own.
  */
 
 export interface ScanSettings {

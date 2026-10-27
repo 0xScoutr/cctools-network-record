@@ -34,6 +34,12 @@ Each module of the deployment's copy maps to one or two files here:
 | the record migration | `sql/schema.sql` |
 | the migration's live check | `sql/check-schema.sql` |
 
+The supply row is outside the lock check below: the check hashes files under
+one root and lists only `scan-record/` and `open-record/`, and the
+deployment's supply job serves other registrars too, so only its Canton Coin
+part was ported. Guarantees 1 and 2 cover the module rows under
+`scan-record/` and `open-record/`; the `sql/` rows are not hashed by it.
+
 The two copies are not byte-identical: here, internal dependencies sit behind
 the seams in `src/runtime/`, and comments describe the package rather than the
 deployment. That is why neither check below compares the copies' text.
@@ -153,7 +159,9 @@ internal dependencies become implementations of the `src/runtime/` seams.
 ## The published-record check (this repository)
 
 `.github/workflows/published-record.yml` runs every day at 06:17 UTC, and by
-hand for any day:
+hand for any day. GitHub turns off scheduled workflows in a public repository
+after 60 days without activity, so a quiet repository stops this check
+without saying so; re-enable it from the Actions tab:
 
 ```sh
 pnpm verify --date <yesterday> --skip-scan --strict

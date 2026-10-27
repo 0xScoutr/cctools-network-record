@@ -1,5 +1,5 @@
 /**
- * Verify one published day of the record, in three parts:
+ * Verify one published day of the record, in four parts:
  *
  *   files      every file read has the sha256 status.json lists for it (a
  *              static file, in some listed generation) or the ETag it was
