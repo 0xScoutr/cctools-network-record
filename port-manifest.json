@@ -76,7 +76,7 @@
     "src/verify/__tests__/csv.test.ts": "46a808bc88d9e6fd5407bbb15a3df5a068a0f3ce986a0980d12023394f74b6d4",
     "src/verify/__tests__/documentation.test.ts": "673022c47d7411c54db9869ade43dcb64d59efcdd58d3d6e1a2e44177dbc2e44",
     "src/verify/__tests__/offline.test.ts": "83c05fb29938b9de541206b9e275ca6a6e07afd18552c8746b6a1aae5cea391f",
-    "src/verify/__tests__/tape.test.ts": "9ebe33341b17108e4b972148b4fb470aa44ee79e0694f69d420a9a74de8d9af9",
+    "src/verify/__tests__/tape.test.ts": "cbcf0b369e38eece8a0d29f2d8d9d2aba2e3b8f9ba0ffed10f44ccbedbd746b6",
     "src/verify/cli.ts": "127f8abee0265702d24042f41227a0b17f816fb79a3baf87392ce13bcbbdf9b7",
     "src/verify/csv.ts": "09fec436a0e79224d9ab753cf53758c7462cf11b6fcffc842c1c9fe106ec918c",
     "src/verify/derive.ts": "8a1bef3b5f2e2503cbbf4b372fb65b23004d370bd0a31224f5141a3af7980368",

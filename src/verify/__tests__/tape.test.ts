@@ -139,10 +139,11 @@ describe("reduceAcsPage", () => {
       const e = JSON.parse(line) as { arguments_dropped?: unknown; response: { created_events?: Array<Record<string, unknown>> } };
       if (!e.arguments_dropped) continue;
       for (const ev of e.response.created_events ?? []) {
-        expect(Object.keys(ev).sort()).toEqual(expect.arrayContaining(["contract_id", "create_arguments", "template_id"]));
+        // Its identity and nothing else: no signatories, observers or other field.
+        const allowed = ["contract_id", "create_arguments", "created_at", "package_name", "template_id"];
+        expect(Object.keys(ev).filter((k) => !allowed.includes(k))).toEqual([]);
+        expect(Object.keys(ev)).toEqual(expect.arrayContaining(["contract_id", "create_arguments", "template_id"]));
         expect(ev.create_arguments).toEqual({});
-        expect(ev.observers).toBeUndefined();
-        expect(ev.signatories).toBeUndefined();
       }
     }
   });

@@ -139,16 +139,28 @@ answers (`scan-tape.jsonl`). `--offline DIR` repeats the same checks over
 them, with the same Scan client code and no network. The tape keeps what the
 derivation reads and states what it left out:
 
-* ACS pages of `DsoRules`, `OpenMiningRound` and `IssuingMiningRound` as served;
+* Scan's answer for the current migration id, and the ACS pages of
+  `DsoRules`, `OpenMiningRound` and `IssuingMiningRound`, as served. These
+  name the DSO, the Super Validators and the synchronizer, which Scan
+  publishes for governance;
 * ACS pages of `FeaturedAppRight` and `ValidatorLicense`, which the record only
-  counts, with each event's `create_arguments` emptied: they name validator
-  and app operators and carry the contact e-mail each validator registered,
-  which a repository should not republish. The entry keeps the event count and
-  the sha256 of the page as served;
-* `/v2/updates` pages with each transaction that holds a StartIssuing exercise,
-  unmodified, and the page's last transaction reduced to its `record_time`
-  (where the page ends). The entry keeps how many transactions the page had and
-  the sha256 of the page as served.
+  counts, with every event reduced to its contract id, template id, package
+  name and creation time: its `create_arguments` are emptied, and its
+  signatories, observers and every other field are left out. Those name
+  validator and app operators and carry the contact e-mail each validator
+  registered, which a repository should not republish. The entry keeps the
+  event count and the sha256 of the page re-serialized as compact JSON
+  (`json_sha256`), not of the bytes as served;
+* `/v2/updates` pages with each transaction that holds a StartIssuing
+  exercise, unmodified (they name the DSO and the Super Validators), and the
+  page's last transaction reduced to its `update_id`, `migration_id` and
+  `record_time` (where the page ends). The entry keeps how many transactions
+  the page had and the sha256 of the body as served.
+
+A test reads the recorded tape and fails if it holds an e-mail address
+anywhere, or if an event of a counted-only page keeps any field beyond those
+four and its emptied arguments. It does not look for parties in the other
+pages, which keep the ones Scan serves there.
 
 Other options: `--skip-scan` (files and render only), `--migration-id N`
 (the synchronizer migration the day's snapshots were taken under; default
