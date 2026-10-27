@@ -31,7 +31,8 @@ import {
 } from "./scan-budget";
 
 const DEFAULT_HOST = "https://api.cantonnodes.com";
-const DEFAULT_USER_AGENT = "cctools-network-record/0.1 (+https://github.com/0xScoutr/cctools-network-record)";
+/** The User-Agent of every Scan call when the settings name none; the registry reader (supply.ts) sends it too. */
+export const DEFAULT_USER_AGENT = "cctools-network-record/0.1 (+https://github.com/0xScoutr/cctools-network-record)";
 /** Our own limit on one call, body included. */
 export const SCAN_TIMEOUT_MS = 30_000;
 const TIMEOUT_MS = SCAN_TIMEOUT_MS;

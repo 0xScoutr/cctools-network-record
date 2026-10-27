@@ -1,8 +1,11 @@
--- Registry supply readings for the Postgres reference adapter
--- (src/adapters/postgres-store.ts, getSupplyAt): one row per exact instant,
--- written by whatever reads the Scan token registry's totalSupply at
--- D+1 00:00:00Z. Not part of the record's guarded tables; the CCTools
--- deployment keeps these readings in its own asset tables instead.
+-- Registry supply readings for the Postgres reference adapter: one row per
+-- totalSupplyAsOf instant of the Scan token registry's Canton Coin
+-- totalSupply, written by the supply collector (src/scan-record/supply.ts,
+-- runSupplyCollection with postgresSupplyWriter) and read by getSupplyAt
+-- (src/adapters/postgres-store.ts), which finalize asks for the reading at
+-- D+1 00:00:00Z. Not part of the record's guarded tables. The CCTools
+-- deployment keeps the same readings in its own asset tables, which the
+-- Supabase adapter reads instead.
 create table if not exists public.network_record_supply (
   supply_as_of  timestamptz primary key,
   total_supply  numeric not null,

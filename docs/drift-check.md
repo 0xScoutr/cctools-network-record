@@ -13,6 +13,7 @@ Each module of the deployment's copy maps to one or two files here:
 |---|---|
 | `scan-record/acs.ts`, `config.ts`, `day-values.ts`, `decimal.ts`, `rounds.ts`, `snapshot.ts`, `collector.ts`, `backfill.ts`, `finalize.ts`, `health.ts`, `scan-budget.ts`, `scan-client.ts`, `round-totals-verified.json` | `src/scan-record/` (same names) |
 | `scan-record/store.ts` | `src/scan-record/store.ts` (interface) and `src/adapters/supabase-store.ts` |
+| `assets/registry.ts` and the Canton Coin part of the deployment's asset supply job | `src/scan-record/supply.ts` |
 | `open-record/contract.ts`, `datapackage.ts`, `day-file.ts`, `methodology.ts`, `publish.ts`, `render.ts`, `serve.ts` | `src/open-record/` (same names) |
 | `open-record/reader.ts` | `src/adapters/supabase-reader.ts` |
 | the record migration | `sql/schema.sql` |

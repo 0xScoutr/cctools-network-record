@@ -31,6 +31,7 @@ src/scan-record/   reading Scan and turning it into a day's values
   acs.ts, snapshot.ts the ACS snapshot series at D+1 00:00:00Z
   collector.ts       forward collection every five minutes, with targeted repair
   backfill.ts        snapshot reads for past days, and the license completion pass
+  supply.ts          the registry supply readings supply_cc is read from, every 15 minutes
   day-values.ts      one day computed from raw inputs, with every sanity gate
   finalize.ts        the single writer of values and gaps: provisional, final, revisions
   health.ts          the alarm latches around those jobs
@@ -65,10 +66,13 @@ A day is a UTC day D: `[D 00:00:00Z, D+1 00:00:00Z)`.
   validator licenses, the reference price) come from the one ACS snapshot at
   D+1 00:00:00Z, read from a single Scan host.
 * **Supply** is the Scan token registry's `totalSupply` whose
-  `totalSupplyAsOf` is exactly D+1 00:00:00Z, read at that instant.
+  `totalSupplyAsOf` is exactly D+1 00:00:00Z. The registry serves only its
+  current reading, so `supply.ts` reads it every 15 minutes and stores every
+  distinct reading (`network_record_supply`); a day whose end was not read
+  while it was current keeps `supply_cc` empty, with its reason.
 
-The collector writes raw inputs only (`network_record_rounds`,
-`network_record_snapshots`). `finalize.ts` is the single writer of the
+The collectors write raw inputs only (`network_record_rounds`,
+`network_record_snapshots`, `network_record_supply`). `finalize.ts` is the single writer of the
 published values: a value is provisional until D+1 02:00 UTC, then final, and
 the day is promised final by D+1 03:00 UTC. A value that fails a sanity gate
 (a round count outside 120 to 160, rounds that do not follow the previous day,
@@ -188,9 +192,9 @@ await runFinalize({ store, now: new Date(), roundTotalsVerified: ROUND_TOTALS_SE
 await publishRecord({ reader: postgresRecordReader(db), cache: directoryFileCache("out"), now: new Date() });
 ```
 
-The schedule the record runs on: the collector every five minutes, finalize
-hourly at :35, render hourly at :40, the snapshot backfill every five minutes
-from 02:00 to 06:00 UTC. Apply `sql/plain-postgres-roles.sql` (not needed on
+The schedule the record runs on: the collector every five minutes, the
+supply collector every 15 minutes, finalize hourly at :35, render hourly at
+:40, the snapshot backfill every five minutes from 02:00 to 06:00 UTC. Apply `sql/plain-postgres-roles.sql` (not needed on
 Supabase), `sql/schema.sql` and `sql/supply.sql` first, then run
 `sql/check-schema.sql`, which must fail with
 `RECORD CHECK (rolled back): all checks ok`.

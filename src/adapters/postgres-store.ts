@@ -1,6 +1,7 @@
 /**
  * The reference RecordStore and RecordReader on plain Postgres, against
- * sql/schema.sql (and sql/supply.sql for getSupplyAt).
+ * sql/schema.sql, and the SupplyWriter whose readings getSupplyAt reads back
+ * (sql/supply.sql).
  *
  * It takes any client with `query(text, params)` that answers `{ rows }`:
  * a node-postgres Pool or Client, or an in-process Postgres such as PGlite
@@ -24,6 +25,7 @@ import {
   type ValueRow,
 } from "../open-record/contract";
 import type { RecordReader } from "../open-record/publish";
+import type { SupplyWriter } from "../scan-record/supply";
 import {
   RecordStoreError,
   VALUE_DATE_SERIES,
@@ -323,6 +325,34 @@ export function postgresRecordStore(db: SqlClient): RecordStore {
 
     markDirty: (atIso) =>
       upsert("scan_record_cursor", [{ id: CURSOR_RENDER, detail: { dirty_at: atIso }, updated_at: atIso }], ["id"], "mark dirty"),
+  };
+}
+
+/**
+ * The supply collector's writer (scan-record/supply.ts): one row per
+ * totalSupplyAsOf instant in network_record_supply. A reading of an instant
+ * already stored is left as it is (a replica repeating it), as the CCTools
+ * deployment keeps its own readings.
+ */
+export function postgresSupplyWriter(db: SqlClient): SupplyWriter {
+  return {
+    async recordSupplyReading(r) {
+      let rows: Record<string, unknown>[];
+      try {
+        rows = (
+          await db.query(
+            `insert into public.network_record_supply (supply_as_of, total_supply, source_host)
+              values ($1::timestamptz, $2::numeric, $3::text)
+              on conflict (supply_as_of) do nothing
+              returning 1 as inserted`,
+            [r.supply_as_of, r.total_supply, r.source_host],
+          )
+        ).rows;
+      } catch (err) {
+        throw fail("write supply", err);
+      }
+      return rows.length > 0;
+    },
   };
 }
 
