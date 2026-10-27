@@ -1,0 +1,64 @@
+{
+  "splice-dso-governance:Splice.DsoRules:DsoRules": {
+    "record_time": "2026-06-02T00:00:00Z",
+    "migration_id": 4,
+    "created_events": [
+      {
+        "event_type": "created_event",
+        "contract_id": "003c9276e0c6",
+        "template_id": "eeb461e9e430d8aaaa232f23058a28c9858d559abd083c391d7ab7e73efb4e13:Splice.DsoRules:DsoRules",
+        "package_name": "splice-dso-governance",
+        "create_arguments": {
+          "dso": "DSO::1220b1431ef2",
+          "epoch": "3",
+          "svs": [
+            ["C7-Technology-Services-Limited::122027859595", { "name": "C7-Technology-Services-Limited", "joinedAsOfRound": { "number": "28175" }, "svRewardWeight": "105750" }],
+            ["Proof-Group-1::1220a0027410", { "name": "Proof-Group-1", "joinedAsOfRound": { "number": "0" }, "svRewardWeight": "250000" }],
+            ["Digital-Asset-2::12209e6b1e37", { "name": "Digital-Asset-2", "joinedAsOfRound": { "number": "0" }, "svRewardWeight": "250000" }],
+            ["Tradeweb-Markets-1::1220f10c3a51", { "name": "Tradeweb-Markets-1", "joinedAsOfRound": { "number": "0" }, "svRewardWeight": "250000" }]
+          ]
+        },
+        "created_at": "2026-05-30T11:02:41.221000Z"
+      }
+    ],
+    "next_page_token": null
+  },
+  "splice-amulet:Splice.Round:OpenMiningRound": {
+    "record_time": "2026-06-02T00:00:00Z",
+    "migration_id": 4,
+    "created_events": [
+      { "event_type": "created_event", "contract_id": "00om98371", "template_id": "fb10433a48c2:Splice.Round:OpenMiningRound", "create_arguments": { "round": { "number": "98371" }, "amuletPrice": "0.1561", "tickDuration": { "microseconds": "600000000" } }, "created_at": "2026-06-01T23:21:00Z" },
+      { "event_type": "created_event", "contract_id": "00om98373", "template_id": "fb10433a48c2:Splice.Round:OpenMiningRound", "create_arguments": { "round": { "number": "98373" }, "amuletPrice": "0.1560", "tickDuration": { "microseconds": "600000000" } }, "created_at": "2026-06-01T23:42:00Z" },
+      { "event_type": "created_event", "contract_id": "00om98372", "template_id": "fb10433a48c2:Splice.Round:OpenMiningRound", "create_arguments": { "round": { "number": "98372" }, "amuletPrice": "0.1562", "tickDuration": { "microseconds": "600000000" } }, "created_at": "2026-06-01T23:31:00Z" }
+    ],
+    "next_page_token": null
+  },
+  "splice-amulet:Splice.Round:IssuingMiningRound": {
+    "record_time": "2026-06-02T00:00:00Z",
+    "migration_id": 4,
+    "created_events": [
+      { "event_type": "created_event", "contract_id": "00im98369", "template_id": "fb10433a48c2:Splice.Round:IssuingMiningRound", "create_arguments": { "round": { "number": "98369" } }, "created_at": "2026-06-01T23:38:10Z" },
+      { "event_type": "created_event", "contract_id": "00im98370", "template_id": "fb10433a48c2:Splice.Round:IssuingMiningRound", "create_arguments": { "round": { "number": "98370" } }, "created_at": "2026-06-01T23:48:31Z" }
+    ],
+    "next_page_token": null
+  },
+  "splice-amulet:Splice.Amulet:FeaturedAppRight": {
+    "record_time": "2026-06-02T00:00:00Z",
+    "migration_id": 4,
+    "created_events": [
+      { "event_type": "created_event", "contract_id": "00b246611a91", "template_id": "1446ffdf2332:Splice.Amulet:FeaturedAppRight", "create_arguments": { "dso": "DSO::1220b1431ef2", "provider": "3trade_validator_admin::122060327be2", "activityWeight": null }, "created_at": "2024-06-29T17:00:53.102952Z" },
+      { "event_type": "created_event", "contract_id": "00c1a2b3c4d5", "template_id": "1446ffdf2332:Splice.Amulet:FeaturedAppRight", "create_arguments": { "dso": "DSO::1220b1431ef2", "provider": "app-provider::1220aa11bb22", "activityWeight": null }, "created_at": "2025-03-11T09:12:00Z" },
+      { "event_type": "created_event", "contract_id": "00d9e8f7a6b5", "template_id": "1446ffdf2332:Splice.Amulet:FeaturedAppRight", "create_arguments": { "dso": "DSO::1220b1431ef2", "provider": "app-provider::1220aa11bb22", "activityWeight": null }, "created_at": "2025-08-02T14:40:00Z" }
+    ],
+    "next_page_token": null
+  },
+  "splice-amulet:Splice.ValidatorLicense:ValidatorLicense": {
+    "record_time": "2026-06-02T00:00:00Z",
+    "migration_id": 4,
+    "created_events": [
+      { "event_type": "created_event", "contract_id": "00vl0001", "template_id": "fb10433a48c2:Splice.ValidatorLicense:ValidatorLicense", "create_arguments": { "validator": "v1::1220aa", "sponsor": "Proof-Group-1::1220a0027410" }, "created_at": "2025-01-10T00:00:00Z" },
+      { "event_type": "created_event", "contract_id": "00vl0002", "template_id": "fb10433a48c2:Splice.ValidatorLicense:ValidatorLicense", "create_arguments": { "validator": "v2::1220bb", "sponsor": "Proof-Group-1::1220a0027410" }, "created_at": "2025-02-10T00:00:00Z" }
+    ],
+    "next_page_token": null
+  }
+}

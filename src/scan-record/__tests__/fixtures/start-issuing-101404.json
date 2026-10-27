@@ -1,0 +1,118 @@
+{
+  "transactions": [
+    {
+      "update_id": "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665",
+      "migration_id": 4,
+      "record_time": "2026-06-22T17:22:32.915254Z",
+      "effective_at": "2026-06-22T17:22:33.027172Z",
+      "events_by_id": {
+        "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:10": {
+          "event_type": "exercised_event",
+          "event_id": "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:10",
+          "contract_id": "0024dafd9baae52bd9b8eb7fde587c500696f7350cb4f25e53fdfa18859c4a1c77ca12122072bfcaa7923d684c043279ff3eb6a8e520a1cc9e6a7269a03662a2817cf93c9e",
+          "template_id": "a31be0483f3175647053f28965a4e6d97e3dbc433ea2338be303fae69bbcff6a:Splice.AmuletRules:AmuletRules",
+          "package_name": "splice-amulet",
+          "choice": "AmuletRules_MiningRound_StartIssuing",
+          "choice_argument": {
+            "miningRoundCid": "003285166a0ee4c436549eb487826aebcaa316a4cd03fbc52fdd8c30196f4360cbca1212202fa35b174071618d45ea411d2a4852df89680633d7dfa78dffb2e7450b40acc9",
+            "summary": {
+              "totalValidatorRewardCoupons": "104448.9262456018",
+              "totalFeaturedAppRewardCoupons": "236926.8131974476",
+              "totalUnfeaturedAppRewardCoupons": "0E-10",
+              "totalSvRewardWeight": "3672500",
+              "optTotalValidatorFaucetCoupons": "0"
+            }
+          },
+          "child_event_ids": [
+            "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:11",
+            "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:12",
+            "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:13",
+            "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:14"
+          ],
+          "exercise_result": {
+            "issuingRoundCid": "001dc15589098500ef6fb688b3630c7e03d93373c048c0447418590a1d18b2286eca1212203ccd520908e51fca4cec945db6ac2b410f7ab0f9fd817c5768c151b424d9f599",
+            "unclaimedDevelopmentFundCouponCid": "007f6eda96e16a7923efd4c2c5fb20556ddf699163c5e4c2046710fa9f60e7c097ca121220f813a700b6c67c453e1e5239d2a97d8a1fe201c76d0c1357c828010e4725446e"
+          },
+          "consuming": false,
+          "acting_parties": [
+            "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc"
+          ],
+          "interface_id": null
+        },
+        "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:11": {
+          "event_type": "exercised_event",
+          "event_id": "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:11",
+          "contract_id": "003285166a0ee4c436549eb487826aebcaa316a4cd03fbc52fdd8c30196f4360cbca1212202fa35b174071618d45ea411d2a4852df89680633d7dfa78dffb2e7450b40acc9",
+          "template_id": "a31be0483f3175647053f28965a4e6d97e3dbc433ea2338be303fae69bbcff6a:Splice.Round:SummarizingMiningRound",
+          "package_name": "splice-amulet",
+          "choice": "Archive",
+          "choice_argument": {},
+          "child_event_ids": [],
+          "exercise_result": {},
+          "consuming": true,
+          "acting_parties": [
+            "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc"
+          ],
+          "interface_id": null
+        },
+        "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:12": {
+          "event_type": "created_event",
+          "event_id": "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:12",
+          "contract_id": "006865c87d562183b3a24412af60c8fee2e42375b081970ee457aede5e85fe8660ca1212206f1ed92439487258db6da8e7df8d2c8cf69f85179251985295a0aef8f857b358",
+          "template_id": "a31be0483f3175647053f28965a4e6d97e3dbc433ea2338be303fae69bbcff6a:Splice.Amulet:UnclaimedReward",
+          "package_name": "splice-amulet",
+          "create_arguments": {
+            "dso": "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc",
+            "amount": "11644.4613262221"
+          },
+          "created_at": "2026-06-22T17:22:33.027172Z",
+          "signatories": [
+            "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc"
+          ],
+          "observers": []
+        },
+        "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:13": {
+          "event_type": "created_event",
+          "event_id": "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:13",
+          "contract_id": "007f6eda96e16a7923efd4c2c5fb20556ddf699163c5e4c2046710fa9f60e7c097ca121220f813a700b6c67c453e1e5239d2a97d8a1fe201c76d0c1357c828010e4725446e",
+          "template_id": "a31be0483f3175647053f28965a4e6d97e3dbc433ea2338be303fae69bbcff6a:Splice.Amulet:UnclaimedDevelopmentFundCoupon",
+          "package_name": "splice-amulet",
+          "create_arguments": {
+            "dso": "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc",
+            "amount": "9512.9375951294"
+          },
+          "created_at": "2026-06-22T17:22:33.027172Z",
+          "signatories": [
+            "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc"
+          ],
+          "observers": []
+        },
+        "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:14": {
+          "event_type": "created_event",
+          "event_id": "122055b2569f65171c15cf3d2666ad5a8785eeea21cd15fef4df1ae51aac40ce1665:14",
+          "contract_id": "001dc15589098500ef6fb688b3630c7e03d93373c048c0447418590a1d18b2286eca1212203ccd520908e51fca4cec945db6ac2b410f7ab0f9fd817c5768c151b424d9f599",
+          "template_id": "a31be0483f3175647053f28965a4e6d97e3dbc433ea2338be303fae69bbcff6a:Splice.Round:IssuingMiningRound",
+          "package_name": "splice-amulet",
+          "create_arguments": {
+            "dso": "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc",
+            "round": {
+              "number": "101404"
+            },
+            "issuancePerValidatorRewardCoupon": "0.2000000000",
+            "issuancePerFeaturedAppRewardCoupon": "0.4729832110",
+            "issuancePerUnfeaturedAppRewardCoupon": "0.4729832110",
+            "issuancePerSvRewardCoupon": "0.0098432030",
+            "opensAt": "2026-06-22T17:32:33.027172Z",
+            "targetClosesAt": "2026-06-22T17:52:33.027172Z",
+            "optIssuancePerValidatorFaucetCoupon": "0E-10"
+          },
+          "created_at": "2026-06-22T17:22:33.027172Z",
+          "signatories": [
+            "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc"
+          ],
+          "observers": []
+        }
+      }
+    }
+  ]
+}

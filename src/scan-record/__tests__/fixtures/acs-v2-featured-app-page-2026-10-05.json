@@ -1,0 +1,13 @@
+{
+  "record_time": "2026-10-05T00:00:00Z",
+  "migration_id": 4,
+  "created_events": [
+    {
+      "contract_id": "00b246611a917faf63f19276ce60b22a1a22e554aa6dc3240f9a1a3c7931bbfab7ca10122012b171f43735f47702ba7fba5a8194c75209cfa3c8ca00fd6b413f76a240a4e5",
+      "template_id": "1446ffdf23326cef2de97923df96618eb615792bea36cf1431f03639448f1645:Splice.Amulet:FeaturedAppRight",
+      "create_arguments": {},
+      "created_at": "2024-06-29T17:00:53.102952Z"
+    }
+  ],
+  "next_page_token": "OTYxNzIzNTAxNQ=="
+}

@@ -1,0 +1,43 @@
+{
+  "name": "cctools-network-record",
+  "version": "0.1.0",
+  "description": "The pipeline behind the CCTools daily record of the Canton Network: Scan reader, round and day logic, finalize, render, and a verify CLI that re-derives a published day from public Scan.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "verify": "tsx src/verify/cli.ts",
+    "verify:offline": "tsx src/verify/cli.ts --offline fixtures/verify/2026-10-25",
+    "manifest": "node scripts/port-manifest.mjs"
+  },
+  "dependencies": {
+    "tsx": "4.19.2"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2",
+    "pg": "^8"
+  },
+  "peerDependenciesMeta": {
+    "@supabase/supabase-js": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.2.17",
+    "@supabase/supabase-js": "2.49.4",
+    "@types/node": "20.17.30",
+    "@types/pg": "8.11.11",
+    "pg": "8.14.1",
+    "typescript": "5.7.3",
+    "vitest": "3.1.1"
+  }
+}

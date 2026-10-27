@@ -1,0 +1,5 @@
+# Sources are LF everywhere.
+* text=auto eol=lf
+# Recorded files are kept byte for byte: their sha256 is what the offline
+# verify checks, and the published CSVs end their lines with CRLF.
+**/fixtures/** -text

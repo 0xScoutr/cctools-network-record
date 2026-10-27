@@ -1,0 +1,152 @@
+import { describe, expect, it } from "vitest";
+import { ROUND_TOTALS_SERIES_VERIFIED } from "../../scan-record/config";
+import { FRESHNESS, LICENSE_SCOPE, SERIES, TRADEMARK_NOTICE } from "../contract";
+import { renderMethodology } from "../methodology";
+import { buildModel } from "../render";
+import { fullDay } from "./helpers/rows";
+
+const doc = JSON.parse(renderMethodology(buildModel(fullDay("2026-10-05"), [], []), ["api.cantonnodes.com"], "g1"));
+const text = JSON.stringify(doc);
+
+describe("methodology.json, the Methodology page content source", () => {
+  it("has its eleven sections, in order", () => {
+    expect(doc.sections.map((s: { id: string }) => s.id)).toEqual([
+      "rules", "daily-record", "sources", "data-classes", "gaps", "revisions", "downloads", "cite",
+      "reproducibility", "limitations", "before-the-record",
+    ]);
+  });
+
+  it("builds the field table from the contract, never from typed copy", () => {
+    const table = doc.sections.find((s: { id: string }) => s.id === "daily-record").table;
+    expect(table.rows).toHaveLength(SERIES.length);
+    expect(table.rows[0][0]).toBe("first_round");
+  });
+
+  it("names the host, says single operator, and uses the qualified access wording", () => {
+    expect(text).toContain("api.cantonnodes.com");
+    expect(text).toContain("single operator");
+    expect(text).toContain("observable by any onboarded validator");
+    expect(text).not.toMatch(/publicly observable(?! by)/);
+  });
+
+  it("names the operator, says it publishes no terms, and scopes the license to the derived aggregates", () => {
+    const sources = doc.sections.find((s: { id: string }) => s.id === "sources");
+    expect(JSON.stringify(sources)).toContain("Proof Group");
+    expect(JSON.stringify(sources)).toContain("no published terms of service or data license");
+    const downloads = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "downloads"));
+    expect(downloads).toContain(LICENSE_SCOPE);
+    expect(downloads).toContain(TRADEMARK_NOTICE);
+    expect(downloads).toContain("permanently free");
+  });
+
+  it("names the host it reads and its operator together, even before a value is stored", () => {
+    const empty = JSON.parse(renderMethodology(buildModel([], [], []), [], "g0"));
+    const sources = JSON.stringify(empty.sections.find((s: { id: string }) => s.id === "sources"));
+    expect(sources).toContain("api.cantonnodes.com");
+    expect(sources).toContain("Proof Group");
+  });
+
+  it("gives every field its settle window and method", () => {
+    const table = doc.sections.find((s: { id: string }) => s.id === "daily-record").table;
+    expect(table.columns).toEqual(["Column", "Unit", "Definition", "Scan source", "Since", "Settle window", "Method"]);
+    expect(table.rows[0][5]).toBe(`Final by ${FRESHNESS.final_by}`);
+    expect(table.rows[0][5]).toBe("Final by D+1 03:00 UTC");
+    expect(table.rows[0][6]).toBe("scan-1");
+  });
+
+  it("states the same freshness targets as status.json", () => {
+    expect(text).toContain(`provisional by ${FRESHNESS.provisional_by} and final by ${FRESHNESS.final_by}`);
+    expect(text).toContain("provisional by D+1 01:00 UTC and final by D+1 03:00 UTC");
+  });
+
+  it("defines the coupon totals as the StartIssuing summary's, never collected before the collector started", () => {
+    const table = doc.sections.find((s: { id: string }) => s.id === "daily-record").table;
+    const row = (name: string) => table.rows.find((r: string[]) => r[0] === name);
+    expect(row("app_reward_coupons")).toEqual(expect.arrayContaining([
+      "coupons", "POST /v2/updates, AmuletRules_MiningRound_StartIssuing summary, totalFeaturedAppRewardCoupons",
+    ]));
+    expect(row("validator_reward_coupons")).toEqual(expect.arrayContaining([
+      "coupons", "POST /v2/updates, AmuletRules_MiningRound_StartIssuing summary, totalValidatorRewardCoupons",
+    ]));
+    const classes = doc.sections.find((s: { id: string }) => s.id === "data-classes").table;
+    expect(classes.rows[0][0]).toContain("reward coupon totals");
+    const limitations = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "limitations"));
+    expect(limitations).toContain("Reward coupon totals start with the forward collector");
+  });
+
+  it("carries the full data-classes table, with the excluded metadata-dependent row", () => {
+    const table = doc.sections.find((s: { id: string }) => s.id === "data-classes").table;
+    expect(table.columns).toEqual(["Series", "Data required", "Class", "Depends on involved-party or Mediator metadata", "If that metadata disappears"]);
+    expect(table.rows.at(-1)).toEqual(["All synchronizer transactions, total parties", "Mediator verdicts, topology", "Metadata-dependent", "Yes", "Would break: excluded from the record"]);
+  });
+
+  it("says nothing is published under scan-rt-1, and why, as config.ts verifies no round-totals series", () => {
+    const revisions = doc.sections.find((s: { id: string }) => s.id === "revisions");
+    const line = revisions.paragraphs.find((p: string) => p.startsWith("Method versions"));
+    expect(line).toBe(
+      "Method versions: scan-1 (forward StartIssuing capture and the D+1 00:00Z ACS snapshot); scan-rt-1 (reserved for the " +
+        "archived round-totals endpoint, which was checked against the StartIssuing split and matches it for neither app nor " +
+        "validator rewards: its app rewards exceed the featured-app pool a round can issue, consistent with counting rewards " +
+        "collected rather than issued, so nothing from it is published).",
+    );
+    // The line is written for this verification: changing a series in config.ts fails here until the line follows.
+    expect(ROUND_TOTALS_SERIES_VERIFIED).toEqual({ app_rewards_cc: false, validator_rewards_cc: false });
+  });
+
+  it("lists the methods of a series' published values only, never the method of an empty row", () => {
+    // 2026-05-01: an empty sv_rewards_cc row labelled scan-rt-1 (a gap's row)
+    // beside an app_rewards_cc value labelled scan-rt-1; 2026-10-05: scan-1 values.
+    const early = fullDay("2026-05-01", "final", { sv_rewards_cc: null }).map((v) =>
+      v.series === "sv_rewards_cc" || v.series === "app_rewards_cc" ? { ...v, method: "scan-rt-1" as const } : v,
+    );
+    const d = JSON.parse(renderMethodology(buildModel([...early, ...fullDay("2026-10-05")], [], []), ["api.cantonnodes.com"], "g2"));
+    const table = d.sections.find((s: { id: string }) => s.id === "daily-record").table;
+    const method = (name: string) => table.rows.find((r: string[]) => r[0] === name)[6];
+    expect(method("sv_rewards_cc")).toBe("scan-1");
+    expect(method("app_rewards_cc")).toBe("scan-rt-1, scan-1");
+  });
+
+  it("says a withdrawal lasts until a correction restores the value (00310 revise_network_record)", () => {
+    const revisions = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "revisions"));
+    expect(revisions).toContain("A withdrawn value stays empty until a correction restores it");
+  });
+
+  it("says only a changed value is a revision (00310: an unchanged value logs nothing and keeps its provenance)", () => {
+    const revisions = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "revisions"));
+    expect(revisions).not.toContain("source host or as-of time changed");
+    expect(revisions).toContain("A recomputation that gives the same value is not a revision");
+  });
+
+  it("states the earlier table's defects instead of hiding them", () => {
+    const before = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "before-the-record"));
+    for (const d of ["2026-03-28", "2026-03-29", "2026-04-14", "2026-06-18", "2026-08-14"]) expect(before).toContain(d);
+    expect(before).toContain("401");
+    expect(before).toContain("429");
+  });
+
+  it("names Loop Data, formerly Lighthouse, by Five North at its first mention, and Loop Data after that", () => {
+    const bridge = "Loop Data (formerly Lighthouse), by Five North";
+    // The first mention in document order is the validator_licenses definition in the daily-record table.
+    expect(text.split(bridge)).toHaveLength(2);
+    expect(text.indexOf("Loop Data")).toBe(text.indexOf(bridge));
+    expect(text.split(bridge).join("")).not.toContain("Lighthouse");
+    const table = doc.sections.find((s: { id: string }) => s.id === "daily-record").table;
+    expect(table.rows.find((r: string[]) => r[0] === "validator_licenses")[2]).toContain(bridge);
+    const sources = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "sources"));
+    expect(sources).toContain("Loop Data and market price providers are not sources of the record.");
+    const before = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "before-the-record"));
+    expect(before).toContain("copied from a third-party indexer (Loop Data).");
+  });
+
+  it("carries the trademark notice in the downloads section, word for word as the site footer does", () => {
+    const downloads = doc.sections.find((s: { id: string }) => s.id === "downloads").paragraphs;
+    expect(downloads).toContain(
+      "Canton is a registered trademark of Digital Asset (Switzerland) GmbH. Digital Asset is not affiliated with, and has not sponsored or endorsed, CCTools.",
+    );
+  });
+
+  it("states freshness as a target until the burn-in is measured", () => {
+    expect(text).toContain("target");
+    expect(text).not.toContain("commitment:");
+  });
+});

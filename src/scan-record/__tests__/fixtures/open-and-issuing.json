@@ -1,0 +1,51 @@
+{
+  "time_to_live_in_microseconds": 60000000,
+  "open_mining_rounds": {
+    "00f4057cd4439d88": {
+      "contract": {
+        "template_id": "fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a:Splice.Round:OpenMiningRound",
+        "contract_id": "00f4057cd4439d88",
+        "created_at": "2026-09-25T10:42:26.749664Z",
+        "payload": {
+          "dso": "DSO::1220b1431ef2",
+          "round": { "number": "114683" },
+          "amuletPrice": "0.119296",
+          "opensAt": "2026-09-25T10:52:26.749664Z",
+          "targetClosesAt": "2026-09-25T11:12:26.749664Z",
+          "tickDuration": { "microseconds": "600000000" },
+          "issuingFor": { "microseconds": "68809800000000" },
+          "issuanceConfig": {
+            "validatorRewardPercentage": "0.18",
+            "optDevelopmentFundPercentage": null,
+            "unfeaturedAppRewardCap": "0.6",
+            "appRewardPercentage": "0.62",
+            "featuredAppRewardCap": "1.5",
+            "amuletToIssuePerYear": "10000000000.0",
+            "validatorRewardCap": "0.2",
+            "optValidatorFaucetCap": "0.0"
+          }
+        }
+      }
+    }
+  },
+  "issuing_mining_rounds": {
+    "00c98a61d34f5395": {
+      "contract": {
+        "template_id": "fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a:Splice.Round:IssuingMiningRound",
+        "contract_id": "00c98a61d34f5395",
+        "created_at": "2026-09-24T06:06:09.707106Z",
+        "payload": {
+          "dso": "DSO::1220b1431ef2",
+          "round": { "number": "114513" },
+          "issuancePerValidatorRewardCoupon": "0.2000000000",
+          "issuancePerFeaturedAppRewardCoupon": "0.5506383526",
+          "issuancePerUnfeaturedAppRewardCoupon": "0.5506383526",
+          "issuancePerSvRewardCoupon": "0.0096487823",
+          "opensAt": "2026-09-24T06:16:09.707106Z",
+          "targetClosesAt": "2026-09-24T06:36:09.707106Z",
+          "optIssuancePerValidatorFaucetCoupon": "0E-10"
+        }
+      }
+    }
+  }
+}
