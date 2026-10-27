@@ -1,12 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-const setCached = vi.fn(async (..._a: unknown[]) => {});
-vi.mock("../../runtime/cache-store", () => ({
-  setCached: (...a: unknown[]) => setCached(...a),
-  getCacheEntry: async () => ({ status: "miss" }),
-}));
-
+import { memoryCacheStore, setCacheStoreBackend } from "../../runtime/cache-store";
 import { apiCacheFileCache, supabaseRecordReader } from "../supabase-reader";
 
 function pagingAdmin(total: number) {
@@ -66,27 +60,68 @@ describe("supabaseRecordReader", () => {
   });
 });
 
+/** An api_cache table in memory: upsert on key, and select(...).eq("key", k).maybeSingle(). */
+function apiCacheAdmin(opts: { readError?: { code: string; message: string } } = {}) {
+  const rows = new Map<string, Record<string, unknown>>();
+  const upserts: Array<{ rows: Array<Record<string, unknown>>; options: unknown }> = [];
+  const admin = {
+    from: (table: string) => {
+      if (table !== "api_cache") throw new Error(`unexpected table ${table}`);
+      return {
+        upsert: (value: Record<string, unknown> | Array<Record<string, unknown>>, options: unknown) => {
+          const list = Array.isArray(value) ? value : [value];
+          upserts.push({ rows: list, options });
+          for (const r of list) rows.set(String(r.key), structuredClone(r));
+          return Promise.resolve({ error: null });
+        },
+        select: () => ({
+          eq: (_column: string, key: string) => ({
+            maybeSingle: () =>
+              Promise.resolve(
+                opts.readError
+                  ? { data: null, error: opts.readError }
+                  : { data: rows.has(key) ? { value: structuredClone(rows.get(key)!.value) } : null, error: null },
+              ),
+          }),
+        }),
+      };
+    },
+  };
+  return { admin: admin as unknown as SupabaseClient, rows, upserts };
+}
+
 describe("apiCacheFileCache", () => {
-  it("stores files in chunks keyed by path, and the manifest through setCached", async () => {
-    const { admin, calls } = pagingAdmin(0);
-    const cache = apiCacheFileCache(admin);
+  // The runtime cache store starts empty in every test, so a manifest can only
+  // come back from the api_cache table itself.
+  beforeEach(() => {
+    setCacheStoreBackend(memoryCacheStore());
+  });
+
+  it("stores files in chunks keyed by path", async () => {
+    const { admin, upserts } = apiCacheAdmin();
     const files = Array.from({ length: 30 }, (_, i) => ({
       path: `days/2026-09-${String(i + 1).padStart(2, "0")}.json`, body: "{}", content_type: "application/json; charset=utf-8",
       sha256: "s", content_sha256: "c", generation_id: "g1", rows: null,
     }));
-    await cache.putFiles(files);
-    const upserts = calls.filter((c) => c.op === "upsert");
+    await apiCacheFileCache(admin).putFiles(files);
     expect(upserts).toHaveLength(2);
-    expect(upserts.every((u) => u.table === "api_cache")).toBe(true);
-    expect((upserts[0].args[0] as Array<{ key: string }>)[0].key).toBe("open-record:v1:file:days/2026-09-01.json");
-    expect((upserts[0].args[0] as unknown[]).length).toBe(25);
-    expect(upserts[0].args[1]).toEqual({ onConflict: "key" });
-    await cache.putManifest({ generation_id: "g1" } as never);
-    expect(setCached).toHaveBeenCalledWith("open-record:v1:manifest", { generation_id: "g1" }, { source: "network-record-render" });
+    expect(upserts[0].rows[0].key).toBe("open-record:v1:file:days/2026-09-01.json");
+    expect(upserts[0].rows).toHaveLength(25);
+    expect(upserts[0].options).toEqual({ onConflict: "key" });
   });
 
-  it("reports a missing manifest as a miss", async () => {
-    const { admin } = pagingAdmin(0);
-    expect(await apiCacheFileCache(admin).manifest()).toEqual({ status: "miss" });
+  it("writes the manifest to api_cache, where a cache in another process reads it back", async () => {
+    const { admin, rows } = apiCacheAdmin();
+    await apiCacheFileCache(admin).putManifest({ generation_id: "g1" } as never);
+    expect(rows.get("open-record:v1:manifest")).toMatchObject({ value: { generation_id: "g1" }, source: "network-record-render" });
+    // A process that starts later has an empty runtime cache store.
+    setCacheStoreBackend(memoryCacheStore());
+    expect(await apiCacheFileCache(admin).manifest()).toEqual({ status: "hit", value: { generation_id: "g1" } });
+  });
+
+  it("reports a missing manifest as a miss, and a failed read as an error", async () => {
+    expect(await apiCacheFileCache(apiCacheAdmin().admin).manifest()).toEqual({ status: "miss" });
+    const failing = apiCacheAdmin({ readError: { code: "57014", message: "canceling statement due to statement timeout" } });
+    expect(await apiCacheFileCache(failing.admin).manifest()).toEqual({ status: "error" });
   });
 });

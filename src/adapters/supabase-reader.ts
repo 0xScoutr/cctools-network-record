@@ -1,14 +1,14 @@
 /**
  * The RecordReader and FileCache on Supabase (PostgREST), as the CCTools
  * deployment runs them: reads the record tables for rendering, and stores the
- * rendered files in its api_cache table. Numerics are read as text (PostgREST
- * would send a double) and every read pages past PostgREST's 1,000-row
- * response cap, which truncates silently. Rendering reads everything a few
- * times a day at most: publish.ts skips clean runs.
+ * rendered files and their manifest in an api_cache table (key, value jsonb,
+ * source, expires_at, updated_at), one row per key. Numerics are read as text
+ * (PostgREST would send a double) and every read pages past PostgREST's
+ * 1,000-row response cap, which truncates silently. Rendering reads
+ * everything a few times a day at most: publish.ts skips clean runs.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCacheEntry, setCached } from "../runtime/cache-store";
 import {
   CURSOR_RENDER,
   MANIFEST_KEY,
@@ -77,12 +77,27 @@ export function supabaseRecordReader(admin: Admin): RecordReader {
   };
 }
 
+/**
+ * The manifest sits in api_cache beside the files, so the next render and
+ * whatever serves the files read what this one wrote, in any process. A read
+ * that fails is an error, never a miss: publish.ts would take a miss for an
+ * empty cache and render every file again over the stored ones.
+ */
 export function apiCacheFileCache(admin: Admin): FileCache {
   return {
     async manifest() {
-      const entry = await getCacheEntry<Manifest>(MANIFEST_KEY);
-      if (entry.status === "hit") return { status: "hit", value: entry.value };
-      return entry;
+      try {
+        const { data, error } = await admin.from("api_cache").select("value").eq("key", MANIFEST_KEY).maybeSingle();
+        if (error) {
+          console.error(`[open-record] read manifest: ${error.code} ${error.message}`);
+          return { status: "error" };
+        }
+        const value = (data as { value: Manifest | null } | null)?.value;
+        return value == null ? { status: "miss" } : { status: "hit", value };
+      } catch (err) {
+        console.error("[open-record] read manifest threw:", err instanceof Error ? err.message : err);
+        return { status: "error" };
+      }
     },
     async putFiles(files) {
       for (let i = 0; i < files.length; i += FILE_CHUNK) {
@@ -91,6 +106,10 @@ export function apiCacheFileCache(admin: Admin): FileCache {
         if (error) throw new Error(`[open-record] write files: ${error.code} ${error.message}`);
       }
     },
-    putManifest: (manifest) => setCached(MANIFEST_KEY, manifest, { source: SOURCE }),
+    async putManifest(manifest) {
+      const row = { key: MANIFEST_KEY, value: manifest, source: SOURCE, expires_at: null };
+      const { error } = await admin.from("api_cache").upsert(row, { onConflict: "key" });
+      if (error) throw new Error(`[open-record] write manifest: ${error.code} ${error.message}`);
+    },
   };
 }

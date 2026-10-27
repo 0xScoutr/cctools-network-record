@@ -1,7 +1,8 @@
 /**
- * Durable JSON entries by key: the rendered files and their manifest
- * (open-record/publish.ts), the alarm latches (runtime/feed-health.ts) and the
- * markers of alerts already delivered (scan-record/health.ts).
+ * Durable JSON entries by key: the alarm latches (runtime/feed-health.ts) and
+ * the markers of alerts already delivered (scan-record/health.ts). The
+ * rendered files and their manifest go to a FileCache instead
+ * (open-record/publish.ts), which keeps both in its own storage.
  *
  * `error` means "could not see", never "nothing there": a writer that reads
  * an error as a miss would overwrite a good entry. The default backend is an
