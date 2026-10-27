@@ -242,7 +242,10 @@ pnpm test
 The suite needs no network and no database server: Scan is stubbed or
 replayed, and the Postgres tests run the real schema, its live check and the
 reference adapter in an in-process Postgres (PGlite). CI runs the type check,
-the tests and the offline verify on every push.
+the tests and the offline verify on every push. A separate scheduled job,
+`published-record`, needs the network: every day it verifies yesterday's
+published files against this code with `--skip-scan --strict`
+(`docs/drift-check.md` says what that does and does not prove).
 
 ## License
 

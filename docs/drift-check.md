@@ -1,11 +1,26 @@
-# Drift check (proposal)
+# Drift check
 
-Status: proposal, not applied. Until the CCTools deployment imports this
-package, it keeps its own copy of these modules. This check makes the
-deployment's CI fail when its copy and this package diverge, so the public
-code is always the code that produces the published files.
+Until the CCTools deployment imports this package, it keeps its own copy of
+these modules. Two checks bound how far the two copies can drift apart, and
+this page says exactly what each one guarantees:
 
-## What is compared
+* **The lock check** (a proposal for the deployment's CI, not applied yet)
+  pins hashes on both sides. It makes every change to a record module in the
+  deployment visible as a change to a lock that names a package commit. It
+  does not compare the deployment's code with the package's: nothing checks
+  that the named commit holds the same change.
+* **The published-record check** (this repository's CI,
+  `.github/workflows/published-record.yml`) renders the files the deployment
+  published again with this package's code, byte for byte, every day. It
+  catches a renderer that drifted, whatever the lock says, but only in what
+  the render covers.
+
+Neither proves on its own that the public code is the code that serves the
+record. A comparison of each deployment module with the package file at the
+pinned commit would close the gap; it needs both sources, so it belongs to
+the deployment's repository.
+
+## What is mapped
 
 Each module of the deployment's copy maps to one or two files here:
 
@@ -21,8 +36,11 @@ Each module of the deployment's copy maps to one or two files here:
 
 The two copies are not byte-identical: here, internal dependencies sit behind
 the seams in `src/runtime/`, and comments describe the package rather than the
-deployment. So the check does not compare the copies with each other. It pins
-both sides:
+deployment. That is why neither check below compares the copies' text.
+
+## The lock check (proposal, in the deployment's repository)
+
+It pins both sides:
 
 * this package's `port-manifest.json` lists the sha256 of every file under
   `src/` and `sql/` (`pnpm manifest`; CI fails when it is out of date);
@@ -30,7 +48,20 @@ both sides:
   above, the package commit they were last ported to, and the sha256 of that
   commit's `port-manifest.json`.
 
-## The lock file (in the deployment's repository)
+What a passing run guarantees, and only that:
+
+1. every record module in the deployment has the hash the lock pins, so a
+   change to one fails CI unless the same change updates the lock;
+2. no record module exists that the lock does not list;
+3. the lock names a package commit whose `port-manifest.json` is the one
+   pinned, so that commit exists and its file set is the one the lock saw.
+
+What it does not guarantee: that the package commit holds the deployment's
+change. Updating the lock is the porter's statement that it does. A lock
+updated without a port, or with a port that changes behaviour, passes; the
+change still shows in review as a lock change next to the module change.
+
+### The lock file
 
 ```json
 {
@@ -45,13 +76,14 @@ both sides:
 }
 ```
 
-## The check
+### The script
 
 ```js
 // check-network-record-drift.mjs, run by the deployment's CI.
-// Fails when a record module changed without being ported to the package,
+// Fails when a record module changed without the lock changing with it,
 // when a module was added or removed without the lock knowing, or when the
-// lock points at a package commit whose manifest is not the one pinned.
+// lock points at a package commit whose manifest is not the one pinned. It
+// does not compare a module with the package's file at that commit.
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -69,7 +101,7 @@ for (const [path, want] of Object.entries(lock.files)) {
     problems.push(`${path}: in the lock, missing from the code`);
     continue;
   }
-  if (got !== want) problems.push(`${path}: changed since the last port (lock ${want.slice(0, 12)}, now ${got.slice(0, 12)})`);
+  if (got !== want) problems.push(`${path}: changed since the lock was last updated (lock ${want.slice(0, 12)}, now ${got.slice(0, 12)})`);
 }
 
 // 2. No module the lock does not know about.
@@ -88,24 +120,24 @@ if (!res.ok) problems.push(`package commit ${lock.commit}: port-manifest.json an
 else if (sha(await res.text()) !== lock.port_manifest_sha256) problems.push(`package commit ${lock.commit}: port-manifest.json is not the pinned one`);
 
 if (problems.length > 0) {
-  console.error(`The record modules and the public package have drifted apart:\n- ${problems.join("\n- ")}`);
+  console.error(`The record modules and the lock disagree:\n- ${problems.join("\n- ")}`);
   console.error("Port the change to the package, push it there, then update the lock in the same change as the module.");
   process.exit(1);
 }
-console.log(`record modules match the package at ${lock.commit.slice(0, 12)}`);
+console.log(`record modules are the ones the lock pins, at package commit ${lock.commit.slice(0, 12)}`);
 ```
 
 The CI step runs it on every push that touches the record modules, the
 migration or the lock:
 
 ```yaml
-- name: Record modules match the public package
+- name: Record modules match the lock
   run: node scripts/check-network-record-drift.mjs network-record.lock.json
   env:
     PACKAGE_READ_TOKEN: ${{ secrets.PACKAGE_READ_TOKEN }}   # only while the package repository is private
 ```
 
-## The workflow it enforces
+### The workflow it asks for
 
 1. A change to a record module in the deployment fails this check.
 2. The same change is ported to this package (with its tests), committed and
@@ -113,15 +145,42 @@ migration or the lock:
 3. The deployment's change updates the lock in the same commit: the new module
    hashes, the package commit, and the new manifest hash.
 
-A reviewer of either side can then see that the code serving the record is the
-public code at a named commit. The check goes away when the deployment imports
-this package and the internal dependencies become implementations of the
-`src/runtime/` seams.
+A reviewer of the deployment's change then sees which package commit it
+claims to match, and has to read that commit to know the port is faithful.
+The check goes away when the deployment imports this package and the
+internal dependencies become implementations of the `src/runtime/` seams.
 
-## A second, behavioural check
+## The published-record check (this repository)
 
-Hashes prove the copies were updated together, not that they behave the same.
-The offline verify adds that: after a port, record a fresh day with
+`.github/workflows/published-record.yml` runs every day at 06:17 UTC, and by
+hand for any day:
+
+```sh
+pnpm verify --date <yesterday> --skip-scan --strict
+```
+
+It reads the files the deployment published, so it needs the network and is
+kept out of the default `ci` workflow, which runs with none. It checks each
+file's sha256 against `status.json` and renders every file again from the
+published rows with this package's code. With `--strict` a warning fails
+too, the prose of `methodology.json` and `datapackage.json` included: the
+day's last render (about 02:40 UTC, before the D+1 03:00 promise) is over
+three hours old by 06:17, longer than the edge serves a copy (an hour, and
+another hour stale while it revalidates, unless the origin is failing), so a
+difference means the deployment rendered with code other than this
+package's.
+
+What it covers: everything `src/open-record/` renders from the published
+rows, on the data the record holds that day. What it does not cover: the
+Scan derivation (`--skip-scan`; re-deriving a day from the public Scan host
+takes over an hour, see the README), code paths the day's data does not
+exercise, and a deployment change that has not reached a render yet. A
+render at an unusual hour (a revision outside the daily cycle) can also
+leave an edge copy of the previous generation within the window and fail a
+run; the next day's run shows whether it lasted.
+
+The Scan derivation is checked by hand after a port: record a fresh day with
 `pnpm verify --date <yesterday> --record fixtures/verify/<yesterday>`, so the
-package's render must reproduce the files the deployment published that day,
-byte for byte, and its Scan derivation must reproduce every value.
+package's derivation must reproduce every value the deployment published that
+day; pointing `verify:offline` (`package.json`) at the new directory keeps
+CI checking it offline from then on.

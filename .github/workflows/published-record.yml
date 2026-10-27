@@ -1,0 +1,41 @@
+name: published-record
+
+# The published files against this package's code, once a day: yesterday's
+# files from https://api.cctools.network are read, checked against
+# status.json and rendered again here, byte for byte (docs/drift-check.md).
+#
+# This job needs the network (it reads the published files), so it is not
+# part of the ci workflow, whose tests run with none. It does not read Scan
+# (--skip-scan): re-deriving a day from the public Scan host takes over an
+# hour (README, "Verify a published day").
+on:
+  schedule:
+    # 06:17 UTC: yesterday is promised final by 03:00 and its last render
+    # (about 02:40) is older than any copy the edge still serves.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Day to verify, YYYY-MM-DD (default: yesterday, UTC)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify the published files of the day (network)
+        env:
+          # Passed through the environment, never into the script text.
+          DATE: ${{ inputs.date }}
+        run: pnpm verify --date "${DATE:-$(date -u -d yesterday +%F)}" --skip-scan --strict
