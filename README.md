@@ -219,5 +219,11 @@ The code is licensed under the Apache License, Version 2.0 (`LICENSE`,
 daily aggregates CCTools derives and their documentation, not the underlying
 Scan data, which the Scan host serves under its own terms.
 
+The recorded data in this repository is not covered by the Apache License:
+the Scan answers (`fixtures/verify/*/scan-tape.jsonl` and
+`src/**/__tests__/fixtures/`) are Scan data under the terms of the host that
+served them, and the copies of published files
+(`fixtures/verify/*/published/`) are the record's own, under CC BY 4.0.
+
 Canton is a registered trademark of Digital Asset (Switzerland) GmbH. Digital
 Asset is not affiliated with, and has not sponsored or endorsed, CCTools.
