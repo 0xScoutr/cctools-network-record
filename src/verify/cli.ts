@@ -6,7 +6,7 @@
  *   online   pnpm verify --date 2026-10-25
  *            [--base-url https://api.cctools.network/api/open/network-record/v1/]
  *            [--scan-host https://api.cantonnodes.com] [--migration-id 4]
- *            [--spacing-ms 6500] [--skip-scan] [--record DIR] [--strict] [--json]
+ *            [--spacing-ms 20000] [--skip-scan] [--record DIR] [--strict] [--json]
  *   offline  pnpm verify --offline DIR [--strict] [--json]
  *
  * --record DIR keeps everything the online run read (the published files, and
@@ -21,7 +21,7 @@ import { OPEN_BASE_URL } from "../open-record/contract";
 import { configureScan } from "../runtime/scan-settings";
 import { liveScanApi } from "../scan-record/scan-client";
 import { dirPublished, httpPublished, recordingPublished, type PublishedSource } from "./published";
-import { pacedFetch, readTape, recordingFetch, replayFetch, writeTape, type TapeEntry } from "./tape";
+import { DEFAULT_SPACING_MS, pacedFetch, readTape, recordingFetch, replayFetch, writeTape, type TapeEntry } from "./tape";
 import { verifyDay, type Check, type VerifyReport } from "./verify";
 
 const DEFAULT_SCAN_HOST = "https://api.cantonnodes.com";
@@ -72,7 +72,7 @@ function help(): never {
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { baseUrl: OPEN_BASE_URL, scanHost: DEFAULT_SCAN_HOST, spacingMs: 6_500, skipScan: false, strict: false, json: false };
+  const args: Args = { baseUrl: OPEN_BASE_URL, scanHost: DEFAULT_SCAN_HOST, spacingMs: DEFAULT_SPACING_MS, skipScan: false, strict: false, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const value = () => {

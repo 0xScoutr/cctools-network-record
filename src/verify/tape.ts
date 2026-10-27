@@ -54,9 +54,20 @@ function isAbort(err: unknown): boolean {
   return name === "TimeoutError" || name === "AbortError";
 }
 
+/**
+ * The default least time between two request starts: about the rate
+ * api.cantonnodes.com sustained for one client while fixtures/verify/2026-10-25
+ * was recorded (215 requests in 76 minutes, about 2.8 a minute, most of the
+ * time beyond the 6.5 s spacing then used spent waiting out 429s). Measured on
+ * that run; the host publishes no limit. At this spacing a day of about 215
+ * requests takes at least 72 minutes, about what the throttled run took, and
+ * asks the host's free tier for nothing it refuses.
+ */
+export const DEFAULT_SPACING_MS = 20_000;
+
 export interface PacedFetchOptions {
-  /** Least time between two request starts. */
-  spacingMs: number;
+  /** Least time between two request starts; DEFAULT_SPACING_MS when absent. */
+  spacingMs?: number;
   /** Retries after a 429 or a dropped connection. */
   retries: number;
   /** Wait before a retry when the host names no Retry-After. */
@@ -67,13 +78,14 @@ export interface PacedFetchOptions {
 
 /** A fetch that spaces its starts and waits out throttles. Each attempt gets its own timeout. */
 export function pacedFetch(opts: PacedFetchOptions): typeof fetch {
+  const spacingMs = opts.spacingMs ?? DEFAULT_SPACING_MS;
   let nextStart = 0;
   const send = opts.send ?? ((input, init) => fetch(input, init));
   return (async (input: string | URL | Request, init?: RequestInit) => {
     for (let attempt = 0; ; attempt++) {
       const wait = nextStart - Date.now();
       if (wait > 0) await sleep(wait);
-      nextStart = Date.now() + opts.spacingMs;
+      nextStart = Date.now() + spacingMs;
       let res: Response;
       try {
         res = await send(input, { ...init, signal: AbortSignal.timeout(SCAN_TIMEOUT_MS) });

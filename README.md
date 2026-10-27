@@ -114,11 +114,16 @@ section counts only values re-derived from Scan.
 
 The default Scan host is `https://api.cantonnodes.com`, the public host the
 record reads (it is named on every value). It rate limits per client IP, so
-the command spaces its requests (`--spacing-ms`, default 6500) and waits out a
-429. Re-deriving one day takes about 220 requests (for 2026-10-25: the ACS
-snapshots and 206 `/v2/updates` pages), which at a few requests a minute is
-over an hour (76 minutes for that day). Any
-other Scan that serves the Splice Scan API can be named with `--scan-host`.
+the command spaces its requests (`--spacing-ms`, default 20000, 20 s) and
+waits out a 429. Re-deriving one day takes about 215 requests (for
+2026-10-25: the migration id, 8 ACS pages and 206 `/v2/updates` pages), so a
+run takes at least 72 minutes at the default spacing. The default comes from
+the run that recorded 2026-10-25: at the earlier spacing of 6.5 s, its 215
+requests needed 23 minutes of spacing but took 76 minutes (about 2.8 a
+minute), so about 53 minutes went to waiting out 429s. That rate was measured
+on that run; the host publishes no limit. Any other Scan that serves the Splice Scan
+API can be named with `--scan-host`, with a shorter `--spacing-ms` if it
+allows more.
 
 ### Offline
 

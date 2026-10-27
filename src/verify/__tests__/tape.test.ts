@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { pacedFetch, recordingFetch, reduceAcsPage, reduceUpdatesPage, replayFetch, type TapeEntry } from "../tape";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_SPACING_MS, pacedFetch, recordingFetch, reduceAcsPage, reduceUpdatesPage, replayFetch, type TapeEntry } from "../tape";
 
 const tx = (id: string, at: string, choice?: string) => ({
   update_id: id,
@@ -67,6 +67,31 @@ describe("pacedFetch", () => {
     expect(res.status).toBe(200);
     expect(signals).toHaveLength(2);
     expect(signals[0]).not.toBe(signals[1]);
+  });
+
+  describe("by default", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts requests 20 s apart, the rate the public host sustained for the recorded day", async () => {
+      expect(DEFAULT_SPACING_MS).toBe(20_000);
+      vi.useFakeTimers();
+      const starts: number[] = [];
+      const send = (async () => {
+        starts.push(Date.now());
+        return new Response("ok", { status: 200 });
+      }) as unknown as typeof fetch;
+      const f = pacedFetch({ retries: 0, backoffMs: 1, send });
+      await f("https://scan.example.invalid/a");
+      const second = f("https://scan.example.invalid/b");
+      await vi.advanceTimersByTimeAsync(19_999);
+      expect(starts).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await second;
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBe(20_000);
+    });
   });
 
   it("returns the last 429 once its retries are spent", async () => {
