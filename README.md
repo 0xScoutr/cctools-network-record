@@ -94,10 +94,12 @@ The command reads the published files and checks three things:
    served.
 2. **Render.** Rendered again by this package's code from the published rows
    (`values.csv`, `gaps.csv`, `revisions.csv`), every file is byte for byte
-   the published one. A difference in `methodology.json` or `datapackage.json`
-   only is reported as a warning: those two are documentation text rendered
-   from the code, and a published copy can predate a text change until the
-   next render.
+   the published one. `methodology.json` and `datapackage.json` also carry
+   prose rendered from the code, which a published copy can predate until the
+   next render: when one of them differs, what it states about the data (the
+   source hosts, each series' first date, method versions, fields and units,
+   reason codes) must still be the same, or the check fails; a difference in
+   the prose alone is a warning.
 3. **Scan.** The day is re-derived from public Scan with the collector's own
    code: the ACS snapshots at D 00:00:00Z and D+1 00:00:00Z, then the
    StartIssuing exercise of every round from `first_round` to `last_round`,

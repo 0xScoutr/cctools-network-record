@@ -7,7 +7,10 @@
  *   render     the files rendered again with this package's code from the
  *              published rows (values.csv, gaps.csv, revisions.csv) are byte
  *              for byte the published ones, so the published bytes come from
- *              this code and those rows;
+ *              this code and those rows. methodology.json and
+ *              datapackage.json are also compared on what they state about
+ *              the data (documentation.ts): a difference there fails, and a
+ *              difference only in their prose is a warning;
  *   scan       the day's values re-derived from Scan (derive.ts) equal the
  *              published ones, value by value;
  *   supply     what Scan cannot serve again for a past day: supply_cc, taken
@@ -16,9 +19,10 @@
  *              are reported apart from the Scan part, so its count is only
  *              of values re-derived from Scan.
  *
- * A check is `ok`, `fail`, `warn` (a difference that is not in the data: a
- * documentation file rendered by an older text, a value Scan cannot serve
- * again) or `info`. A run passes when nothing fails; strict also fails warnings.
+ * A check is `ok`, `fail`, `warn` (a difference that is not in the data: the
+ * prose of a documentation file rendered by another text version, a file an
+ * edge still serves from an older generation, a value held by a gate) or
+ * `info`. A run passes when nothing fails; strict also fails warnings.
  */
 
 import { createHash } from "node:crypto";
@@ -48,6 +52,7 @@ import {
 } from "../open-record/render";
 import type { ScanApi } from "../scan-record/scan-client";
 import { deriveDay, type DerivedDay } from "./derive";
+import { documentationFactsDiffer } from "./documentation";
 import { gapRows, revisionRows, valueRows, type PublishedFile, type PublishedSource } from "./published";
 
 export type CheckStatus = "ok" | "fail" | "warn" | "info";
@@ -68,7 +73,7 @@ export interface VerifyReport {
   passed: boolean;
 }
 
-/** Files whose text is documentation rendered from the code: a difference there is not a difference in the data. */
+/** Files whose prose is documentation rendered from the code; what they state about the data is compared strictly. */
 const DOCUMENTATION_FILES = new Set(["methodology.json", "datapackage.json"]);
 /** Series Scan cannot serve again for a past day: the registry serves only the current supply. */
 const INPUT_SERIES = new Set<SeriesName>(["supply_cc"]);
@@ -178,14 +183,12 @@ export async function verifyDay(opts: {
     const publishedBody = path === dayPath ? dayFile.body : path === prevDayPath ? prevDayFile!.body : files.get(path)!.body;
     if (body === publishedBody) {
       add("render", path, "ok", `identical, ${Buffer.byteLength(body, "utf8")} bytes`);
+    } else if (!DOCUMENTATION_FILES.has(path)) {
+      add("render", path, "fail", `differs: ${firstDifference(publishedBody, body)}`);
     } else {
-      const doc = DOCUMENTATION_FILES.has(path);
-      add(
-        "render",
-        path,
-        doc ? "warn" : "fail",
-        `${doc ? "documentation text differs (rendered by a different text version)" : "differs"}: ${firstDifference(publishedBody, body)}`,
-      );
+      const facts = documentationFactsDiffer(path, publishedBody, body);
+      if (facts) add("render", path, "fail", `differs in what it states about the data: ${facts}`);
+      else add("render", path, "warn", `only its prose differs (rendered by a different text version): ${firstDifference(publishedBody, body)}`);
     }
   }
 
