@@ -1,18 +1,18 @@
 /**
- * network-record-verify: check one published day of the CCTools daily record
- * of the Canton Network against its own files, this package's renderer and
- * public Scan.
+ * The verify command (`pnpm verify`, which runs this file with tsx): check
+ * one published day of the CCTools daily record of the Canton Network against
+ * its own files, this package's renderer and public Scan.
  *
- *   online   network-record-verify --date 2026-10-25
+ *   online   pnpm verify --date 2026-10-25
  *            [--base-url https://api.cctools.network/api/open/network-record/v1/]
  *            [--scan-host https://api.cantonnodes.com] [--migration-id 4]
  *            [--spacing-ms 6500] [--skip-scan] [--record DIR] [--strict] [--json]
- *   offline  network-record-verify --offline DIR [--strict] [--json]
+ *   offline  pnpm verify --offline DIR [--strict] [--json]
  *
  * --record DIR keeps everything the online run read (the published files, and
  * a tape of the Scan answers) so that --offline DIR repeats the same checks
- * with no network. Exit code 0 when nothing failed, 1 when a check failed, 2
- * for a usage or run error.
+ * with no network. Exit code 0 when nothing failed (and for --help), 1 when a
+ * check failed, 2 for a usage or run error.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -51,17 +51,24 @@ interface FixtureMeta {
   tool: string;
 }
 
-function usage(message?: string): never {
-  if (message) console.error(`error: ${message}\n`);
-  console.error(
-    [
-      "usage:",
-      "  network-record-verify --date YYYY-MM-DD [--base-url URL] [--scan-host URL] [--migration-id N]",
-      "                        [--spacing-ms MS] [--skip-scan] [--record DIR] [--strict] [--json]",
-      "  network-record-verify --offline DIR [--strict] [--json]",
-    ].join("\n"),
-  );
+const USAGE = [
+  "usage:",
+  "  pnpm verify --date YYYY-MM-DD [--base-url URL] [--scan-host URL] [--migration-id N]",
+  "              [--spacing-ms MS] [--skip-scan] [--record DIR] [--strict] [--json]",
+  "  pnpm verify --offline DIR [--strict] [--json]",
+].join("\n");
+
+/** A usage error: the message and the usage on stderr, exit 2. */
+function usage(message: string): never {
+  console.error(`error: ${message}\n`);
+  console.error(USAGE);
   process.exit(2);
+}
+
+/** --help: the usage on stdout, exit 0. */
+function help(): never {
+  console.log(USAGE);
+  process.exit(0);
 }
 
 function parseArgs(argv: string[]): Args {
@@ -84,7 +91,7 @@ function parseArgs(argv: string[]): Args {
       case "--offline": args.offline = value(); break;
       case "--strict": args.strict = true; break;
       case "--json": args.json = true; break;
-      case "--help": case "-h": usage();
+      case "--help": case "-h": help();
       default: usage(`unknown argument ${a}`);
     }
   }

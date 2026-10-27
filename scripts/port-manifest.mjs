@@ -7,8 +7,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+// fileURLToPath, not URL.pathname: a pathname keeps a space or an accent
+// percent-encoded, and on Windows puts a slash before the drive letter.
+const root = fileURLToPath(new URL("..", import.meta.url));
 const roots = ["src", "sql"];
 
 function walk(dir) {
