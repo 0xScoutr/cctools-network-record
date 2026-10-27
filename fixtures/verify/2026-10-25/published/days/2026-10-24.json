@@ -1,0 +1,255 @@
+{
+  "schema_version": "1.0.0",
+  "generation_id": "g20261026T004002Z",
+  "date": "2026-10-24",
+  "status": "final",
+  "revision": 0,
+  "revised_at": null,
+  "prev": "2026-10-23",
+  "next": "2026-10-25",
+  "values": {
+    "first_round": {
+      "value": 118675,
+      "unit": "round number",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "last_round": {
+      "value": 118814,
+      "unit": "round number",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "rounds": {
+      "value": 140,
+      "unit": "rounds",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "supply_cc": {
+      "value": "39914743397.2747429538",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "net_supply_change_cc": {
+      "value": "7810437.8394550078",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "reference_price_usd": {
+      "value": "0.1014950000",
+      "unit": "USD per CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "issuance_cc": {
+      "value": "26636225.2669362332",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "app_rewards_cc": {
+      "value": "15688736.6817464175",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "validator_rewards_cc": {
+      "value": "2680591.3311017565",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "sv_rewards_cc": {
+      "value": "5060882.7866925000",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "dev_fund_cc": {
+      "value": "1331811.2633181160",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "faucet_rewards_cc": {
+      "value": "0.0000000000",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "unfeatured_app_rewards_cc": {
+      "value": "0.0000000000",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "unclaimed_rewards_cc": {
+      "value": "1874203.2040774432",
+      "unit": "CC",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "super_validators": {
+      "value": 13,
+      "unit": "members",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "sv_voting_threshold": {
+      "value": 9,
+      "unit": "votes",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "featured_apps": {
+      "value": 139,
+      "unit": "contracts",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "validator_licenses": {
+      "value": 1538,
+      "unit": "contracts",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-25T00:00:00Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "app_reward_coupons": {
+      "value": "29695561.5145316504",
+      "unit": "coupons",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    },
+    "validator_reward_coupons": {
+      "value": "13411134.2243164365",
+      "unit": "coupons",
+      "status": "final",
+      "source_host": "api.cantonnodes.com",
+      "method": "scan-1",
+      "as_of": "2026-10-24T23:55:27Z",
+      "revision": 0,
+      "revised_at": null,
+      "gap": null
+    }
+  },
+  "gaps": [],
+  "revisions": [],
+  "notes": [],
+  "citation": {
+    "plain": "CCTools. \"Daily record, 24 Oct 2026\", Canton Network daily record, revision 0. As of 25 Oct 2026 00:00 UTC. https://cctools.network/network/2026-10-24. Retrieved {retrieved}. CC BY 4.0.",
+    "bibtex": "@misc{cctools_record_2026_10_24, author={{CCTools}}, title={Daily record, 24 October 2026}, year={2026}, howpublished={\\url{https://cctools.network/network/2026-10-24}}, note={Revision 0; schema 1.0.0; retrieved {retrieved}; CC BY 4.0}}",
+    "permalink": "https://cctools.network/network/2026-10-24",
+    "dataset": "CCTools (2026). CCTools daily record of the Canton Network, schema 1.0.0, release 2026-10."
+  },
+  "license": {
+    "name": "CC-BY-4.0",
+    "title": "Creative Commons Attribution 4.0 International",
+    "path": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "license_scope": "CC BY 4.0 covers the daily aggregates CCTools derives and this documentation. They are derived from Scan data served publicly by a Super Validator; the host is named in the sources and on every value, and CCTools licenses only its derived aggregates, not the underlying Scan data.",
+  "attribution": "Source: CCTools daily record of the Canton Network (CC BY 4.0), https://cctools.network/network",
+  "links": {
+    "daily_csv": "https://api.cctools.network/api/open/network-record/v1/daily.csv",
+    "daily_json": "https://api.cctools.network/api/open/network-record/v1/daily.json",
+    "gaps_csv": "https://api.cctools.network/api/open/network-record/v1/gaps.csv",
+    "datapackage": "https://api.cctools.network/api/open/network-record/v1/datapackage.json",
+    "methodology": "https://api.cctools.network/api/open/network-record/v1/methodology.json"
+  }
+}

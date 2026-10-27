@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-25",
+  "recorded_at": "2026-10-27T08:24:46.558Z",
+  "base_url": "https://api.cctools.network/api/open/network-record/v1/",
+  "scan_host": "https://api.cantonnodes.com",
+  "migration_id": 4,
+  "migration_id_arg": null,
+  "scan_requests": 215,
+  "tool": "cctools-network-record verify"
+}

@@ -1,0 +1,385 @@
+{
+  "$schema": "https://datapackage.org/profiles/2.0/datapackage.json",
+  "name": "cctools-canton-network-daily-record",
+  "title": "CCTools daily record of the Canton Network",
+  "description": "One row per UTC day of Canton Network state, derived from Scan data served publicly by a Super Validator: rounds, issuance by category, supply, the SV reference price, Super Validators, featured apps and validator licenses. Every missing value has a reason in gaps.csv and every change after a value became final is in revisions.csv. CC BY 4.0 covers the daily aggregates CCTools derives and this documentation. They are derived from Scan data served publicly by a Super Validator; the host is named in the sources and on every value, and CCTools licenses only its derived aggregates, not the underlying Scan data.",
+  "version": "1.0.0",
+  "generation_id": "g20261020T100713Z",
+  "homepage": "https://cctools.network/network",
+  "licenses": [
+    {
+      "name": "CC-BY-4.0",
+      "title": "Creative Commons Attribution 4.0 International",
+      "path": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
+  "rights": "CC BY 4.0 covers the daily aggregates CCTools derives and this documentation. They are derived from Scan data served publicly by a Super Validator; the host is named in the sources and on every value, and CCTools licenses only its derived aggregates, not the underlying Scan data.",
+  "trademark_notice": "Canton is a registered trademark of Digital Asset (Switzerland) GmbH. Digital Asset is not affiliated with, and has not sponsored or endorsed, CCTools.",
+  "sources": [
+    {
+      "title": "Canton Scan (Splice Scan API) served by api.cantonnodes.com (Canton Nodes, powered by Proof Group, a Super Validator; a commercial service whose free tier is rate limited, with no published terms of service or data license)",
+      "path": "https://api.cantonnodes.com"
+    }
+  ],
+  "resources": [
+    {
+      "name": "daily",
+      "path": "daily.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "description": "UTC day D: the interval [D 00:00:00Z, D+1 00:00:00Z)."
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "final, or provisional until the day settles.",
+            "constraints": {
+              "enum": [
+                "final",
+                "provisional"
+              ]
+            }
+          },
+          {
+            "name": "first_round",
+            "type": "integer",
+            "description": "Lowest mining round assigned to the day. A round belongs to day D when the record time of its AmuletRules_MiningRound_StartIssuing exercise falls in D (UTC).",
+            "title": "First round",
+            "unit": "round number"
+          },
+          {
+            "name": "last_round",
+            "type": "integer",
+            "description": "Highest mining round assigned to the day. A round belongs to day D when the record time of its AmuletRules_MiningRound_StartIssuing exercise falls in D (UTC).",
+            "title": "Last round",
+            "unit": "round number"
+          },
+          {
+            "name": "rounds",
+            "type": "integer",
+            "description": "Number of rounds assigned to the day, last_round - first_round + 1, checked for contiguity with the previous day.",
+            "title": "Rounds",
+            "unit": "rounds"
+          },
+          {
+            "name": "supply_cc",
+            "type": "number",
+            "description": "Total Canton Coin supply at the end of the day (D+1 00:00:00Z): the Scan token registry's totalSupply whose totalSupplyAsOf is that instant.",
+            "title": "Supply",
+            "unit": "CC"
+          },
+          {
+            "name": "net_supply_change_cc",
+            "type": "number",
+            "description": "supply_cc(D) - supply_cc(D-1). Not issuance minus burn: minting is lumpy and burn can exceed it on a given day.",
+            "title": "Net supply change",
+            "unit": "CC"
+          },
+          {
+            "name": "reference_price_usd",
+            "type": "number",
+            "description": "SV-voted Canton Coin price (amuletPrice, the median of Super Validator votes) of the highest-numbered OpenMiningRound in the ACS snapshot at D+1 00:00:00Z. Not a market price.",
+            "title": "Reference price",
+            "unit": "USD per CC"
+          },
+          {
+            "name": "issuance_cc",
+            "type": "number",
+            "description": "Issuance scheduled by the day's rounds: the sum of the seven category columns. Not minted supply.",
+            "title": "Issuance",
+            "unit": "CC"
+          },
+          {
+            "name": "app_rewards_cc",
+            "type": "number",
+            "description": "Featured-app reward issuance of the day's rounds: totalFeaturedAppRewardCoupons x issuancePerFeaturedAppRewardCoupon, as fixed at StartIssuing.",
+            "title": "App rewards",
+            "unit": "CC"
+          },
+          {
+            "name": "validator_rewards_cc",
+            "type": "number",
+            "description": "Validator reward issuance of the day's rounds: totalValidatorRewardCoupons x issuancePerValidatorRewardCoupon.",
+            "title": "Validator rewards",
+            "unit": "CC"
+          },
+          {
+            "name": "sv_rewards_cc",
+            "type": "number",
+            "description": "Super Validator reward issuance of the day's rounds: totalSvRewardWeight x issuancePerSvRewardCoupon.",
+            "title": "Super Validator rewards",
+            "unit": "CC"
+          },
+          {
+            "name": "dev_fund_cc",
+            "type": "number",
+            "description": "Development Fund share of the day's rounds: the amount of each UnclaimedDevelopmentFundCoupon created at StartIssuing.",
+            "title": "Development Fund",
+            "unit": "CC"
+          },
+          {
+            "name": "faucet_rewards_cc",
+            "type": "number",
+            "description": "Validator faucet issuance: optTotalValidatorFaucetCoupons x optIssuancePerValidatorFaucetCoupon. A measured zero while the faucet cap is 0.",
+            "title": "Validator faucet",
+            "unit": "CC"
+          },
+          {
+            "name": "unfeatured_app_rewards_cc",
+            "type": "number",
+            "description": "Unfeatured-app issuance: totalUnfeaturedAppRewardCoupons x issuancePerUnfeaturedAppRewardCoupon.",
+            "title": "Unfeatured app rewards",
+            "unit": "CC"
+          },
+          {
+            "name": "unclaimed_rewards_cc",
+            "type": "number",
+            "description": "Issuance not assigned to any coupon: the amount of the UnclaimedReward created at StartIssuing, read from its own event, never computed as a remainder.",
+            "title": "Unclaimed rewards",
+            "unit": "CC"
+          },
+          {
+            "name": "super_validators",
+            "type": "integer",
+            "description": "Members of DsoRules.svs in the ACS snapshot at D+1 00:00:00Z.",
+            "title": "Super Validators",
+            "unit": "members"
+          },
+          {
+            "name": "sv_voting_threshold",
+            "type": "integer",
+            "description": "Votes a DSO action needs for that membership: ceiling((n + f + 1) / 2) with f = floor((n - 1) / 3), as Splice DsoRules.daml summarizeDso computes it.",
+            "title": "Voting threshold",
+            "unit": "votes"
+          },
+          {
+            "name": "featured_apps",
+            "type": "integer",
+            "description": "Active FeaturedAppRight contracts in the ACS snapshot at D+1 00:00:00Z (contracts, not distinct providers).",
+            "title": "Featured apps",
+            "unit": "contracts"
+          },
+          {
+            "name": "validator_licenses",
+            "type": "integer",
+            "description": "Active ValidatorLicense contracts in the ACS snapshot at D+1 00:00:00Z. A new series: not the validator_count of Loop Data (formerly Lighthouse), by Five North.",
+            "title": "Validator licenses",
+            "unit": "contracts"
+          },
+          {
+            "name": "app_reward_coupons",
+            "type": "number",
+            "description": "Featured-app reward coupons of the day's rounds: the sum of totalFeaturedAppRewardCoupons in each round's AmuletRules_MiningRound_StartIssuing summary. app_rewards_cc is each round's total times its issuancePerFeaturedAppRewardCoupon. A sum of coupon amounts, not a count of apps or transactions. Empty, as not collected, before the forward collector's first full day; the update-stream backfill is planned.",
+            "title": "App reward coupons",
+            "unit": "coupons"
+          },
+          {
+            "name": "validator_reward_coupons",
+            "type": "number",
+            "description": "Validator reward coupons of the day's rounds: the sum of totalValidatorRewardCoupons in each round's AmuletRules_MiningRound_StartIssuing summary. validator_rewards_cc is each round's total times its issuancePerValidatorRewardCoupon. A sum of coupon amounts, not a count of validators. Empty, as not collected, before the forward collector's first full day; the update-stream backfill is planned.",
+            "title": "Validator reward coupons",
+            "unit": "coupons"
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "description": "Method versions of the row's values, joined by +."
+          },
+          {
+            "name": "revision",
+            "type": "integer",
+            "description": "Published revisions of the row's values since release."
+          },
+          {
+            "name": "revised_at",
+            "type": "datetime",
+            "description": "Time of the row's latest published revision."
+          }
+        ],
+        "primaryKey": [
+          "date"
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "values",
+      "path": "values.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "description": "UTC day."
+          },
+          {
+            "name": "series",
+            "type": "string",
+            "description": "Column name in daily.csv."
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "description": "The value; empty when not recorded (reason in gaps.csv)."
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "final or provisional."
+          },
+          {
+            "name": "source_host",
+            "type": "string",
+            "description": "Scan host the value was read from."
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "description": "Method version (scan-1, scan-rt-1)."
+          },
+          {
+            "name": "as_of",
+            "type": "datetime",
+            "description": "Time the value describes."
+          },
+          {
+            "name": "revision",
+            "type": "integer",
+            "description": "Published revisions of this value since release."
+          },
+          {
+            "name": "revised_at",
+            "type": "datetime",
+            "description": "Time of its latest published revision."
+          }
+        ],
+        "primaryKey": [
+          "date",
+          "series"
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "gaps",
+      "path": "gaps.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "description": "UTC day."
+          },
+          {
+            "name": "series",
+            "type": "string",
+            "description": "Column name, or all for a missing day."
+          },
+          {
+            "name": "reason_code",
+            "type": "string",
+            "description": "Why the value is missing."
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "description": "The reason in words."
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "open, backfill_planned, permanent or resolved."
+          },
+          {
+            "name": "detected_at",
+            "type": "datetime",
+            "description": "When the gap was recorded."
+          },
+          {
+            "name": "resolved_at",
+            "type": "datetime",
+            "description": "When it was resolved; empty while open."
+          },
+          {
+            "name": "evidence_url",
+            "type": "string",
+            "description": "Link to supporting evidence, when there is one."
+          }
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "revisions",
+      "path": "revisions.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "description": "UTC day."
+          },
+          {
+            "name": "series",
+            "type": "string",
+            "description": "Column name."
+          },
+          {
+            "name": "old_value",
+            "type": "number",
+            "description": "Value before the change; empty for a backfill."
+          },
+          {
+            "name": "new_value",
+            "type": "number",
+            "description": "Value after the change; empty for a withdrawal."
+          },
+          {
+            "name": "kind",
+            "type": "string",
+            "description": "backfill, correction, withdrawal or method."
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "description": "Why it changed."
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "description": "Method version of the new value."
+          },
+          {
+            "name": "revised_at",
+            "type": "datetime",
+            "description": "When it changed."
+          }
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    }
+  ]
+}

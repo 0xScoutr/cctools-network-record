@@ -1,0 +1,385 @@
+{
+  "schema_version": "1.0.0",
+  "generation_id": "g20261020T100713Z",
+  "title": "Methodology",
+  "sections": [
+    {
+      "id": "rules",
+      "title": "The rules",
+      "paragraphs": [
+        "Every figure carries its source and its time. \"As of\" is the time the data describes; \"retrieved\" is when CCTools read it.",
+        "Gaps stay gaps: a value that was not recorded is empty, never zero, and every empty value in a final row has a reason in gaps.csv.",
+        "History is corrected after publication, in the open: every change to a final value is a row in revisions.csv."
+      ]
+    },
+    {
+      "id": "daily-record",
+      "title": "The daily record",
+      "paragraphs": [
+        "A day is a UTC day D: [D 00:00:00Z, D+1 00:00:00Z). Snapshot series are the state at D+1 00:00:00Z, so a snapshot minus the previous day's snapshot is the flow of day D.",
+        "A mining round belongs to day D when the record time of its AmuletRules_MiningRound_StartIssuing exercise falls in D. first_round and last_round are published so anyone can recompute a day.",
+        "A value is provisional until its day has settled, then final: provisional by D+1 01:00 UTC and final by D+1 03:00 UTC, as a target."
+      ],
+      "table": {
+        "columns": [
+          "Column",
+          "Unit",
+          "Definition",
+          "Scan source",
+          "Since",
+          "Settle window",
+          "Method"
+        ],
+        "rows": [
+          [
+            "first_round",
+            "round number",
+            "Lowest mining round assigned to the day. A round belongs to day D when the record time of its AmuletRules_MiningRound_StartIssuing exercise falls in D (UTC).",
+            "ACS snapshot, IssuingMiningRound (and StartIssuing record times)",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "last_round",
+            "round number",
+            "Highest mining round assigned to the day. A round belongs to day D when the record time of its AmuletRules_MiningRound_StartIssuing exercise falls in D (UTC).",
+            "ACS snapshot, IssuingMiningRound (and StartIssuing record times)",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "rounds",
+            "rounds",
+            "Number of rounds assigned to the day, last_round - first_round + 1, checked for contiguity with the previous day.",
+            "ACS snapshot, IssuingMiningRound (and StartIssuing record times)",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "supply_cc",
+            "CC",
+            "Total Canton Coin supply at the end of the day (D+1 00:00:00Z): the Scan token registry's totalSupply whose totalSupplyAsOf is that instant.",
+            "GET /registry/metadata/v1/instruments, totalSupply",
+            "2026-09-02",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "net_supply_change_cc",
+            "CC",
+            "supply_cc(D) - supply_cc(D-1). Not issuance minus burn: minting is lumpy and burn can exceed it on a given day.",
+            "Derived from supply_cc",
+            "2026-09-03",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "reference_price_usd",
+            "USD per CC",
+            "SV-voted Canton Coin price (amuletPrice, the median of Super Validator votes) of the highest-numbered OpenMiningRound in the ACS snapshot at D+1 00:00:00Z. Not a market price.",
+            "ACS snapshot, OpenMiningRound amuletPrice",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "issuance_cc",
+            "CC",
+            "Issuance scheduled by the day's rounds: the sum of the seven category columns. Not minted supply.",
+            "Derived: the seven categories",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "app_rewards_cc",
+            "CC",
+            "Featured-app reward issuance of the day's rounds: totalFeaturedAppRewardCoupons x issuancePerFeaturedAppRewardCoupon, as fixed at StartIssuing.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "validator_rewards_cc",
+            "CC",
+            "Validator reward issuance of the day's rounds: totalValidatorRewardCoupons x issuancePerValidatorRewardCoupon.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "sv_rewards_cc",
+            "CC",
+            "Super Validator reward issuance of the day's rounds: totalSvRewardWeight x issuancePerSvRewardCoupon.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "dev_fund_cc",
+            "CC",
+            "Development Fund share of the day's rounds: the amount of each UnclaimedDevelopmentFundCoupon created at StartIssuing.",
+            "POST /v2/updates, UnclaimedDevelopmentFundCoupon created at StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "faucet_rewards_cc",
+            "CC",
+            "Validator faucet issuance: optTotalValidatorFaucetCoupons x optIssuancePerValidatorFaucetCoupon. A measured zero while the faucet cap is 0.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "unfeatured_app_rewards_cc",
+            "CC",
+            "Unfeatured-app issuance: totalUnfeaturedAppRewardCoupons x issuancePerUnfeaturedAppRewardCoupon.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "unclaimed_rewards_cc",
+            "CC",
+            "Issuance not assigned to any coupon: the amount of the UnclaimedReward created at StartIssuing, read from its own event, never computed as a remainder.",
+            "POST /v2/updates, UnclaimedReward created at StartIssuing",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "super_validators",
+            "members",
+            "Members of DsoRules.svs in the ACS snapshot at D+1 00:00:00Z.",
+            "ACS snapshot, DsoRules",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "sv_voting_threshold",
+            "votes",
+            "Votes a DSO action needs for that membership: ceiling((n + f + 1) / 2) with f = floor((n - 1) / 3), as Splice DsoRules.daml summarizeDso computes it.",
+            "ACS snapshot, DsoRules",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "featured_apps",
+            "contracts",
+            "Active FeaturedAppRight contracts in the ACS snapshot at D+1 00:00:00Z (contracts, not distinct providers).",
+            "ACS snapshot, FeaturedAppRight",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "validator_licenses",
+            "contracts",
+            "Active ValidatorLicense contracts in the ACS snapshot at D+1 00:00:00Z. A new series: not the validator_count of Loop Data (formerly Lighthouse), by Five North.",
+            "ACS snapshot, ValidatorLicense",
+            "2026-03-26",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "app_reward_coupons",
+            "coupons",
+            "Featured-app reward coupons of the day's rounds: the sum of totalFeaturedAppRewardCoupons in each round's AmuletRules_MiningRound_StartIssuing summary. app_rewards_cc is each round's total times its issuancePerFeaturedAppRewardCoupon. A sum of coupon amounts, not a count of apps or transactions. Empty, as not collected, before the forward collector's first full day; the update-stream backfill is planned.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing summary, totalFeaturedAppRewardCoupons",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ],
+          [
+            "validator_reward_coupons",
+            "coupons",
+            "Validator reward coupons of the day's rounds: the sum of totalValidatorRewardCoupons in each round's AmuletRules_MiningRound_StartIssuing summary. validator_rewards_cc is each round's total times its issuancePerValidatorRewardCoupon. A sum of coupon amounts, not a count of validators. Empty, as not collected, before the forward collector's first full day; the update-stream backfill is planned.",
+            "POST /v2/updates, AmuletRules_MiningRound_StartIssuing summary, totalValidatorRewardCoupons",
+            "2026-10-01",
+            "Final by D+1 03:00 UTC",
+            "scan-1"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "sources",
+      "title": "Sources",
+      "paragraphs": [
+        "Canton Scan (the Splice Scan API that Super Validators serve), read through api.cantonnodes.com. This is a single operator until a second Super Validator source is added; the host is recorded on every value.",
+        "api.cantonnodes.com: Canton Nodes, powered by Proof Group, a Super Validator; a commercial service whose free tier is rate limited, with no published terms of service or data license.",
+        "Scan data is observable by any onboarded validator through Scan, and publicly through third-party Scan proxies. When two Super Validator scans are available, each day's snapshot series will be read from both and compared.",
+        "Loop Data and market price providers are not sources of the record."
+      ]
+    },
+    {
+      "id": "data-classes",
+      "title": "What each series depends on",
+      "paragraphs": [
+        "The record publishes no party-level rows. Per-party data stays behind the keyed API."
+      ],
+      "table": {
+        "columns": [
+          "Series",
+          "Data required",
+          "Class",
+          "Depends on involved-party or Mediator metadata",
+          "If that metadata disappears"
+        ],
+        "rows": [
+          [
+            "Issuance by category, reward coupon totals, rounds, reference price",
+            "DSO round contracts and the StartIssuing exercise",
+            "Observable by any onboarded validator through Scan; publicly through third-party Scan proxies",
+            "No",
+            "Unaffected"
+          ],
+          [
+            "Supply",
+            "Registry metadata (a DSO-level aggregate)",
+            "Observable by any onboarded validator through Scan; publicly through third-party Scan proxies",
+            "No",
+            "Unaffected"
+          ],
+          [
+            "Super Validators, threshold, featured apps, validator licenses",
+            "DSO-governed contracts",
+            "Observable by any onboarded validator through Scan; publicly through third-party Scan proxies",
+            "No (operator parties appear in contracts, not in Mediator metadata)",
+            "Unaffected"
+          ],
+          [
+            "All synchronizer transactions, total parties",
+            "Mediator verdicts, topology",
+            "Metadata-dependent",
+            "Yes",
+            "Would break: excluded from the record"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "gaps",
+      "title": "Gaps",
+      "paragraphs": [
+        "Every empty value in a final row joins a reason in gaps.csv, or the day stays provisional and an alert fires."
+      ],
+      "table": {
+        "columns": [
+          "reason_code",
+          "Meaning"
+        ],
+        "rows": [
+          [
+            "not_collected",
+            "Before this series was collected; a backfill may be planned."
+          ],
+          [
+            "source_unavailable",
+            "The source did not answer, or has not published the reading yet."
+          ],
+          [
+            "source_not_available_before",
+            "The source has no reading this far back."
+          ],
+          [
+            "pending_past_deadline",
+            "Still pending after the day's settle deadline."
+          ],
+          [
+            "withdrawn",
+            "A published value was withdrawn; it stays empty until a correction restores it (see revisions.csv)."
+          ],
+          [
+            "not_derivable",
+            "Cannot be derived from Scan data."
+          ],
+          [
+            "sources_disagree",
+            "Two readings of the same fact disagreed; held until resolved."
+          ],
+          [
+            "sanity_gate_failed",
+            "The value failed a sanity check and is held, never published as a confident number."
+          ],
+          [
+            "round_missed",
+            "A mining round was not captured and the targeted repair has not recovered it."
+          ]
+        ]
+      }
+    },
+    {
+      "id": "revisions",
+      "title": "Corrections and revisions",
+      "paragraphs": [
+        "A final value changes only as a logged revision: backfill (empty to value), correction (a new value, with its source host and as-of time), withdrawal (value to empty, with a new gap) or method (a new value recomputed under a new method version). A recomputation that gives the same value is not a revision: the value keeps its revision number, source host and as-of time. The database enforces this.",
+        "A withdrawn value stays empty until a correction restores it: the daily jobs never put a withdrawn number back.",
+        "Method versions: scan-1 (forward StartIssuing capture and the D+1 00:00Z ACS snapshot); scan-rt-1 (reserved for the archived round-totals endpoint, which was checked against the StartIssuing split and matches it for neither app nor validator rewards: its app rewards exceed the featured-app pool a round can issue, consistent with counting rewards collected rather than issued, so nothing from it is published).",
+        "Backfill before the first public release (2026-10) is part of release 0; revision counters start at 0 on release day."
+      ]
+    },
+    {
+      "id": "downloads",
+      "title": "Downloads and license",
+      "paragraphs": [
+        "Files: https://api.cctools.network/api/open/network-record/v1/daily.csv, https://api.cctools.network/api/open/network-record/v1/daily.json, https://api.cctools.network/api/open/network-record/v1/values.csv, https://api.cctools.network/api/open/network-record/v1/gaps.csv, https://api.cctools.network/api/open/network-record/v1/revisions.csv, https://api.cctools.network/api/open/network-record/v1/datapackage.json, one file per day at https://api.cctools.network/api/open/network-record/v1/days/YYYY-MM-DD.json, and https://api.cctools.network/api/open/network-record/v1/status.json. No key, no cookie.",
+        "Schema 1.0.0. An added column is a minor version on the same path; a rename, removal or change of unit is a new major version at /v2/, and /v1/ keeps serving for at least six months.",
+        "Data and this text: Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/). Attribution: Source: CCTools daily record of the Canton Network (CC BY 4.0), https://cctools.network/network.",
+        "CC BY 4.0 covers the daily aggregates CCTools derives and this documentation. They are derived from Scan data served publicly by a Super Validator; the host is named in the sources and on every value, and CCTools licenses only its derived aggregates, not the underlying Scan data.",
+        "These daily files are permanently free and keyless. Paid products are sold on freshness, granularity and support, never on access to the daily facts.",
+        "Please cache: the files change at most hourly. Intraday and per-round data are in the keyed API.",
+        "Canton is a registered trademark of Digital Asset (Switzerland) GmbH. Digital Asset is not affiliated with, and has not sponsored or endorsed, CCTools."
+      ]
+    },
+    {
+      "id": "cite",
+      "title": "How to cite",
+      "paragraphs": [
+        "Each day page and days/YYYY-MM-DD.json carry a plain citation and a BibTeX entry; replace {retrieved} with the date you read it.",
+        "Dataset: CCTools (2026). CCTools daily record of the Canton Network, schema 1.0.0, release 2026-10."
+      ]
+    },
+    {
+      "id": "reproducibility",
+      "title": "Reproducibility",
+      "paragraphs": [
+        "first_round and last_round let anyone recompute a day's issuance from Scan. status.json lists the sha256 of every file for the last 24 generations."
+      ]
+    },
+    {
+      "id": "limitations",
+      "title": "Known limitations",
+      "paragraphs": [
+        "The reference price is the Super Validators' voted price, not a market price.",
+        "Issuance is what the rounds schedule, not minted supply: unclaimed rewards are not minted and some shares are minted only when claimed, so net supply change can be negative or larger than a day's issuance.",
+        "Burn and transaction counts are not in schema 1.0.0; they arrive as new columns when measured.",
+        "Reward coupon totals start with the forward collector: the round-totals archive does not carry them, so earlier days are empty (not collected) until the update-stream backfill. A coupon total is a sum of coupon amounts, not a count of apps, validators or transactions.",
+        "Single operator until a second Super Validator source is added. App rewards and app reward coupons change method when the network switches reward versions (CIP-104)."
+      ]
+    },
+    {
+      "id": "before-the-record",
+      "title": "Before the open record",
+      "paragraphs": [
+        "CCTools kept an earlier daily table copied from a third-party indexer (Loop Data). It is not carried into this record, and its defects are listed here so the history is not hidden:",
+        "Missing dates: 2026-03-28, 2026-03-29, 2026-04-14, 2026-06-18, 2026-08-14.",
+        "On 2026-08-14 a missing column stopped the daily write, which is why that date is absent.",
+        "Its supply figure stayed frozen at one value from mid-August 2026, about 5% below the registry supply.",
+        "In September 2026 several values are empty because the indexer answered 401 or 429 on those days."
+      ]
+    }
+  ]
+}

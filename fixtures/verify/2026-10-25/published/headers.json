@@ -1,0 +1,42 @@
+{
+  "status.json": {
+    "etag": null,
+    "generation": null
+  },
+  "daily.csv": {
+    "etag": "\"13e839ef950e648ae88107b919a1ee1aabf859b0317ce6a1ac6b6015c2ca8dff\"",
+    "generation": "g20261027T024001Z"
+  },
+  "daily.json": {
+    "etag": "W/\"b44c41d4256cc96d41297c7331466193a07717e8ad0b210bc2987f752c70285d\"",
+    "generation": "g20261027T024001Z"
+  },
+  "values.csv": {
+    "etag": "\"df3be44ad83d4cb9d52feb82da7d3936ae7eed664fbd9b7729de9234d6176169\"",
+    "generation": "g20261027T024001Z"
+  },
+  "gaps.csv": {
+    "etag": "\"ea338d6465d180a7785b957b07ca1ba6f7d5a7557cb0cc6f291d04553d859ea2\"",
+    "generation": "g20261026T014001Z"
+  },
+  "revisions.csv": {
+    "etag": "\"791c3bee4516ce08473005cc21405ec4411490dfc69d302864f114fe80ece115\"",
+    "generation": "g20260930T164001Z"
+  },
+  "datapackage.json": {
+    "etag": "W/\"eff55e4ada65c85ebd605f38be6edcb3fc8bac49c80702d0951b1bf33473d488\"",
+    "generation": "g20261020T100713Z"
+  },
+  "methodology.json": {
+    "etag": "W/\"6147f6eeedf377ebdcf5d469bd873cc2007b73afa283a2a8770d87ea036229cf\"",
+    "generation": "g20261020T100713Z"
+  },
+  "days/2026-10-25.json": {
+    "etag": "W/\"a9636a4077813dea2cd722a74041a50c3c3918e1aaff67b51815b127b506f533\"",
+    "generation": "g20261027T004001Z"
+  },
+  "days/2026-10-24.json": {
+    "etag": "W/\"5abf551634a98f674fe8964c80ca748457614ac6c54a40aebf3754508dfb9374\"",
+    "generation": "g20261026T004002Z"
+  }
+}
