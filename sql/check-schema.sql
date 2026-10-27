@@ -12,7 +12,8 @@
 --   RECORD CHECK (rolled back): all checks ok
 -- and the three counts are 0. Any other message is a finding: stop and report
 -- it. The test suite runs it against an in-process Postgres
--- (src/adapters/__tests__/postgres-schema.test.ts) and pins its text
+-- (src/adapters/__tests__/postgres-store.test.ts, "sql/schema.sql in
+-- Postgres") and pins its text
 -- (src/open-record/__tests__/migration-contract.test.ts).
 
 do $check$

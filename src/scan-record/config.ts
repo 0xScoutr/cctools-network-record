@@ -1,10 +1,11 @@
 /**
  * Whether each /v0/round-totals series means the same thing as the
  * StartIssuing split, per series. Only a verified series would be published
- * from the archive (method scan-rt-1, day-values.ts) and written by its
- * import, which refuses to write anything while none is. The values live in
- * round-totals-verified.json, a plain JSON file that this module and an
- * import script without TypeScript can both read, so the two cannot disagree.
+ * from the archive (method scan-rt-1, day-values.ts). The import that writes
+ * archive rows into network_record_rounds is not part of this package: the
+ * CCTools deployment runs it, and it reads the same round-totals-verified.json
+ * (a plain JSON file, so a script without TypeScript can read it) and refuses
+ * to write anything while no series is verified.
  *
  * Neither series is verified, so nothing from the archive is imported or
  * published. The meaning check:

@@ -10,9 +10,9 @@
  * lists match contract.ts, and the RPC is not callable by anon.
  *
  * The live behaviour is checked by sql/check-schema.sql, a single DO block
- * that always rolls back; src/adapters/__tests__/postgres-schema.test.ts runs
- * it against an in-process Postgres. The last test here pins that it walks
- * every path above.
+ * that always rolls back; src/adapters/__tests__/postgres-store.test.ts runs
+ * it against an in-process Postgres ("sql/schema.sql in Postgres"). The last
+ * test here pins that it walks every path above.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
