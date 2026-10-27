@@ -3,3 +3,6 @@ dist/
 coverage/
 *.log
 .verify-out/
+# examples/run-pipeline.ts: its database and the files it renders
+.record-db/
+out/

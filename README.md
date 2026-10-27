@@ -84,7 +84,8 @@ the schema enforces it.
 
 ## Verify a published day
 
-Requires Node 20 or later and pnpm.
+Requires Node 22, the version CI runs, and pnpm (`package.json` pins its
+version; `corepack enable` installs it).
 
 ```sh
 pnpm install
@@ -172,32 +173,59 @@ the current one), `--strict` (warnings fail too), `--json`.
 
 ## Run the pipeline
 
-The jobs take a `RecordStore` and a `ScanApi`:
+The jobs take a `RecordStore` and a `ScanApi`. `examples/run-pipeline.ts` runs
+each of them once against a local Postgres; run it from the repository root
+with `pnpm exec tsx examples/run-pipeline.ts`:
 
 ```ts
+// One pass of the record's jobs against a local Postgres: the schema, the
+// round collector, the supply collector, finalize, and the render into out/.
+// Run it from the repository root, on the schedule the README gives:
+//
+//   pnpm exec tsx examples/run-pipeline.ts
+//
+// It reads public Scan (SCAN_RECORD_HOSTS, default https://api.cantonnodes.com)
+// and keeps the database in .record-db/, so each run continues the last one.
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite"; // or a node-postgres Pool
-import { postgresRecordStore, postgresRecordReader } from "./src/adapters/postgres-store";
-import { directoryFileCache } from "./src/adapters/directory-file-cache";
-import { runForwardCollection, COLLECTOR_LOCK } from "./src/scan-record/collector";
-import { runFinalize } from "./src/scan-record/finalize";
-import { ROUND_TOTALS_SERIES_VERIFIED } from "./src/scan-record/config";
-import { liveScanApi } from "./src/scan-record/scan-client";
-import { publishRecord } from "./src/open-record/publish";
+import { directoryFileCache } from "../src/adapters/directory-file-cache";
+import { postgresRecordReader, postgresRecordStore, postgresSupplyWriter, type SqlClient } from "../src/adapters/postgres-store";
+import { publishRecord } from "../src/open-record/publish";
+import { COLLECTOR_LOCK, runForwardCollection } from "../src/scan-record/collector";
+import { ROUND_TOTALS_SERIES_VERIFIED } from "../src/scan-record/config";
+import { runFinalize } from "../src/scan-record/finalize";
+import { liveScanApi } from "../src/scan-record/scan-client";
+import { runSupplyCollection } from "../src/scan-record/supply";
 
-const pg = await PGlite.create();
-const db = { query: async (text: string, params?: unknown[]) => ({ rows: (await pg.query(text, params)).rows as Record<string, unknown>[] }) };
+const pg = await PGlite.create(".record-db");
+// The schema files are idempotent, so every run applies them.
+for (const file of ["plain-postgres-roles.sql", "schema.sql", "supply.sql"]) {
+  await pg.exec(readFileSync(new URL(`../sql/${file}`, import.meta.url), "utf-8"));
+}
+const db: SqlClient = {
+  query: async (text, params) => ({ rows: (await pg.query(text, params)).rows as Record<string, unknown>[] }),
+};
+
 const store = postgresRecordStore(db);
-await runForwardCollection({ store, scan: liveScanApi("record"), now: new Date(), deadline: Date.now() + COLLECTOR_LOCK.holdMs - COLLECTOR_LOCK.marginMs });
+await runForwardCollection({
+  store,
+  scan: liveScanApi("record"),
+  now: new Date(),
+  deadline: Date.now() + COLLECTOR_LOCK.holdMs - COLLECTOR_LOCK.marginMs,
+});
+await runSupplyCollection({ writer: postgresSupplyWriter(db) });
 await runFinalize({ store, now: new Date(), roundTotalsVerified: ROUND_TOTALS_SERIES_VERIFIED });
 await publishRecord({ reader: postgresRecordReader(db), cache: directoryFileCache("out"), now: new Date() });
+await pg.close();
 ```
 
 The schedule the record runs on: the collector every five minutes, the
 supply collector every 15 minutes, finalize hourly at :35, render hourly at
-:40, the snapshot backfill every five minutes from 02:00 to 06:00 UTC. Apply `sql/plain-postgres-roles.sql` (not needed on
-Supabase), `sql/schema.sql` and `sql/supply.sql` first, then run
-`sql/check-schema.sql`, which must fail with
-`RECORD CHECK (rolled back): all checks ok`.
+:40, the snapshot backfill every five minutes from 02:00 to 06:00 UTC. On a
+database of your own, apply `sql/plain-postgres-roles.sql` (not needed on
+Supabase), `sql/schema.sql` and `sql/supply.sql` first (the example applies
+them on every run: they are idempotent), then run `sql/check-schema.sql`
+once, which must fail with `RECORD CHECK (rolled back): all checks ok`.
 
 The runtime seams default to one process: `runtime/shared-cache.ts` (the Scan
 gate, the call queue and the job locks) and `runtime/cache-store.ts` keep
