@@ -109,7 +109,8 @@ describe("publishRecord", () => {
   });
 
   it("names only the hosts of published values, as daily.json does", async () => {
-    // A withdrawal keeps the row's old source_host (00310); a null names no source.
+    // A null row can still carry a source_host (the schema's provenance check
+    // allows it); a null names no source.
     const withdrawn = { ...vrow(D1, "featured_apps", null), source_host: "scan.other.example" };
     const h = harness([...fullDay(D0), ...fullDay(D1).filter((v) => v.series !== "featured_apps"), withdrawn]);
     await publishRecord({ reader: h.reader, cache: h.cache, now: at("2026-10-06T02:40:00Z") });

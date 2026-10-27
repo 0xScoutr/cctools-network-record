@@ -89,8 +89,9 @@ describe("daily.json", () => {
 
 describe("values.csv, gaps.csv, revisions.csv", () => {
   it("lists every stored value with its provenance, and names no source for a null", () => {
-    // A withdrawal keeps the row's old source_host and as_of (00310): a null
-    // must not credit the host with a figure CCTools withdrew.
+    // A null row can still carry a source_host and as_of (the schema's
+    // provenance check allows it): a null must not credit the host with a
+    // figure CCTools does not publish.
     const { body, rows } = renderValuesCsv(model());
     expect(rows).toBe(2 * SERIES.length);
     expect(body).toContain(`${D2},app_rewards_cc,,provisional,,scan-1,,0,`);

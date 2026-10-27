@@ -259,7 +259,7 @@ export const CURSOR_BACKFILL = "backfill";
 export const CURSOR_SNAPSHOT = "snapshot";
 
 /**
- * The one door for changing a final value (migration 00310):
+ * The one door for changing a final value (sql/schema.sql):
  * revise_network_record(p_date, p_series, p_value, p_kind, p_reason,
  * p_method, p_source_host, p_as_of). The last three default to null, which
  * keeps the row's own; a withdrawal clears source_host and as_of instead. A
@@ -311,7 +311,7 @@ export function sameFinalValue(a: string | null, b: string | null): boolean {
 
 /**
  * SQLSTATEs of the two refusals that normal operation meets. Every other
- * refusal of the 00310 triggers and RPC is P0001 and means a bug.
+ * refusal of the schema's triggers and RPC is P0001 and means a bug.
  *
  * FINAL_CHANGED: a final network_record_values row was changed outside
  * REVISE_RPC.

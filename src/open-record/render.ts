@@ -217,11 +217,11 @@ export function recordSourceHosts(model: RecordModel): string[] {
 }
 
 /**
- * Where a published value came from. A null names no source. 00310 already
- * clears source_host and as_of on a withdrawal (revise_network_record), and
- * its provenance CHECK lets any null row name neither; this rule is a second
- * guard, so no null row, withdrawn or not, can credit a host with a figure
- * CCTools does not publish.
+ * Where a published value came from. A null names no source. The schema
+ * already clears source_host and as_of on a withdrawal
+ * (revise_network_record), and its provenance CHECK lets any null row name
+ * neither; this rule is a second guard, so no null row, withdrawn or not, can
+ * credit a host with a figure CCTools does not publish.
  */
 export function publishedProvenance(v: ValueRow): { source_host: string | null; as_of: string | null } {
   return v.value == null ? { source_host: null, as_of: null } : { source_host: v.source_host, as_of: isoZ(v.as_of) };

@@ -32,7 +32,7 @@ function codeOf(p: Promise<unknown>): Promise<string | null> {
   return p.then(() => "not refused", (err: unknown) => recordErrorCode(err));
 }
 
-describe("memoryStore keeps the 00310 refusals", () => {
+describe("memoryStore keeps the schema's refusals", () => {
   it("refuses to fill a gap's null without its source host and as_of, like the RPC", async () => {
     const m = withFinal(null);
     expect(await codeOf(m.store.revise(DATE, SERIES, "5", "backfill", "late data"))).toBe("P0001");

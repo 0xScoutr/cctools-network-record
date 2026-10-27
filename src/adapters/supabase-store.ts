@@ -5,10 +5,10 @@
  * filter is on a key or an indexed column, and no read may run into
  * PostgREST's 1,000-row response cap unnoticed.
  *
- * getSupplyAt reads the registry supply readings of a separate collector
- * (tables `assets` and `asset_supply_snapshots`), which are not part of
- * sql/schema.sql: the Postgres reference adapter reads its own
- * network_record_supply table instead.
+ * getSupplyAt reads the registry supply readings from the operator's own
+ * asset tables (OPERATOR_SUPPLY below), which the CCTools deployment's supply
+ * collector writes and which are not part of sql/schema.sql. The Postgres
+ * reference adapter reads network_record_supply (sql/supply.sql) instead.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -43,6 +43,13 @@ const GAP_SELECT = "date, series, reason_code, reason, status, detected_at, reso
 const MAX_ROWS = 1_000;
 
 const CC_REGISTRY_HOST = "api.cantonnodes.com";
+
+/**
+ * The operator's own supply tables, outside sql/schema.sql: the asset row of
+ * CC's Scan registry, and the readings stored for it, one per totalSupplyAsOf
+ * instant, tagged with the source they came from.
+ */
+const OPERATOR_SUPPLY = { assets: "assets", readings: "asset_supply_snapshots", source: "scan_registry" } as const;
 
 function fail(what: string, error: { code?: string; message: string }): Error {
   return new RecordStoreError(what, error);
@@ -217,15 +224,15 @@ export function supabaseRecordStore(admin: Admin): RecordStore {
     async getSupplyAt(instantIso) {
       if (ccAssetId === undefined) {
         const { data, error } = await admin
-          .from("assets").select("id").eq("instrument_id", "Amulet")
+          .from(OPERATOR_SUPPLY.assets).select("id").eq("instrument_id", "Amulet")
           .ilike("registry_base_url", `%${CC_REGISTRY_HOST}%`).limit(1).maybeSingle();
         if (error) throw fail("read CC asset", error);
         ccAssetId = (data as { id: string } | null)?.id ?? null;
       }
       if (!ccAssetId) return null;
       const { data, error } = await admin
-        .from("asset_supply_snapshots").select("total_supply::text")
-        .eq("asset_id", ccAssetId).eq("source", "scan_registry").eq("supply_as_of", instantIso).maybeSingle();
+        .from(OPERATOR_SUPPLY.readings).select("total_supply::text")
+        .eq("asset_id", ccAssetId).eq("source", OPERATOR_SUPPLY.source).eq("supply_as_of", instantIso).maybeSingle();
       if (error) throw fail("read supply", error);
       const row = data as { total_supply: string } | null;
       return row ? { value: row.total_supply, source_host: CC_REGISTRY_HOST } : null;

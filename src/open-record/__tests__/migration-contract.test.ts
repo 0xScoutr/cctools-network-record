@@ -83,7 +83,7 @@ const TABLES = [
   "network_record_gaps",
 ];
 
-describe("00310_network_record.sql", () => {
+describe("sql/schema.sql", () => {
   it.each(TABLES)("%s is created, RLS on, anon and authenticated revoked", (t) => {
     expect(SQL).toContain(`create table if not exists public.${t} (`);
     expect(SQL).toContain(`alter table public.${t} enable row level security;`);

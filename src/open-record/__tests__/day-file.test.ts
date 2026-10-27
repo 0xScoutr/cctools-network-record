@@ -82,8 +82,8 @@ describe("days/{date}.json", () => {
   });
 
   it("lets an open withdrawal explain a null ahead of every other open gap", () => {
-    // revise_network_record can withdraw a value that is already null (00310,
-    // v_unchanged), and finalize leaves a withdrawn series out of its gap
+    // revise_network_record can withdraw a value that is already null
+    // (sql/schema.sql, v_unchanged), and finalize leaves a withdrawn series out of its gap
     // resolution, so the round_missed gap stays open beside the withdrawal.
     const gaps = [
       gapRow(D0, "all", { reason_code: "source_unavailable", reason: "Scan unreachable for 3 hours", status: "open" }),
@@ -170,8 +170,8 @@ describe("days/{date}.json", () => {
   });
 
   it("names no source for a withdrawn null and cites the as_of of published values only", () => {
-    // A withdrawal keeps the row's old source_host and as_of (00310): here a
-    // later as_of than every published value.
+    // A null row can still carry a source_host and as_of (the schema's
+    // provenance check allows it): here a later as_of than every published value.
     const rows = fullDay(D0).map((v) => (v.series === "app_rewards_cc" ? { ...v, value: null, as_of: `${D1}T05:00:00+00:00` } : v));
     const withdrawn = gapRow(D0, "app_rewards_cc", { reason_code: "withdrawn", reason: "Wrong coupon category", status: "open" });
     const f = day(D0, buildModel(rows, [withdrawn], []));

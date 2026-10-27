@@ -106,12 +106,12 @@ describe("methodology.json, the Methodology page content source", () => {
     expect(method("app_rewards_cc")).toBe("scan-rt-1, scan-1");
   });
 
-  it("says a withdrawal lasts until a correction restores the value (00310 revise_network_record)", () => {
+  it("says a withdrawal lasts until a correction restores the value (revise_network_record in sql/schema.sql)", () => {
     const revisions = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "revisions"));
     expect(revisions).toContain("A withdrawn value stays empty until a correction restores it");
   });
 
-  it("says only a changed value is a revision (00310: an unchanged value logs nothing and keeps its provenance)", () => {
+  it("says only a changed value is a revision (the schema: an unchanged value logs nothing and keeps its provenance)", () => {
     const revisions = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "revisions"));
     expect(revisions).not.toContain("source host or as-of time changed");
     expect(revisions).toContain("A recomputation that gives the same value is not a revision");
