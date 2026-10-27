@@ -1,9 +1,9 @@
 /**
  * Mining rounds as Scan serves them, and the issuance split of each round.
  *
- * The split is read from the AmuletRules_MiningRound_StartIssuing exercise
- *: its `summary` carries the coupon totals, the IssuingMiningRound
- * it creates carries the per-coupon rates, and the UnclaimedReward and
+ * The split is read from the AmuletRules_MiningRound_StartIssuing exercise:
+ * its `summary` carries the coupon totals, the IssuingMiningRound it creates
+ * carries the per-coupon rates, and the UnclaimedReward and
  * UnclaimedDevelopmentFundCoupon it creates carry those two amounts. Unclaimed
  * is read from its own event and never computed as a remainder, so the
  * per-round gate is not a tautology.

@@ -1,6 +1,5 @@
 /**
- * The single writer of network_record_values and network_record_gaps
- *.
+ * The single writer of network_record_values and network_record_gaps.
  *
  *   before D+1 02:00Z  values are provisional; a transient gap stays open
  *   after              values become final; an explained null becomes a final

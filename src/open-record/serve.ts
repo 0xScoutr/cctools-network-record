@@ -63,9 +63,9 @@ export function etagMatches(ifNoneMatch: string | null, sha256: string): boolean
  * expected_final_date: the newest day the stated final_by says is final by now.
  * lag_hours: hours past the final_by (D+1 03:00 UTC) of the first day that is
  * not final yet, 0 when none is due.
- * stale ("Lagging", health 503): no day is final yet, or the due day is not
- *. No grace on top: the
- * promise already holds the publish cycle after the 02:00 settle deadline.
+ * stale ("Lagging", health 503): no day is final yet, or latest_final_date is
+ * older than the due day. No grace on top: the promise already holds the
+ * publish cycle after the 02:00 settle deadline.
  */
 export function statusDocument(m: Manifest, nowMs: number) {
   const expected = expectedFinalDate(nowMs);

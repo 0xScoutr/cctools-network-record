@@ -153,8 +153,8 @@ export const COLLECTOR_LIMITS = {
 
 /**
  * One run of forward collection. Each field says which outcome of the
- * collector's health feed it feeds, so a failure pages
- * on the outcome it belongs to. health.ts reads start-issuing and acs-snapshot
+ * collector's health feed it feeds, so a failure pages on the outcome it
+ * belongs to. health.ts reads start-issuing and acs-snapshot
  * through forwardStartIssuingHealth and forwardSnapshotHealth, never from
  * fields it picks itself:
  *   rounds-poll    fails on `busy`, `errors` or `stalled` (or no `host`): the
@@ -428,9 +428,9 @@ export function captureWrite(
 }
 
 /**
- * StartIssuing time of `round`, interpolated from the nearest captured rounds
- *. Null when no captured round lies within
- * COLLECTOR_LIMITS.repairAnchorRounds of it: no estimate a repair window can trust.
+ * StartIssuing time of `round`, interpolated from the nearest captured rounds.
+ * Null when no captured round lies within COLLECTOR_LIMITS.repairAnchorRounds
+ * of it: no estimate a repair window can trust.
  */
 export function estimateStartMs(round: number, known: Map<number, Pick<RoundRow, "start_issuing_at">>): number | null {
   let lo: [number, number] | null = null;

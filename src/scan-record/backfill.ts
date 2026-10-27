@@ -3,11 +3,11 @@
  * for DsoRules, OpenMiningRound, IssuingMiningRound and FeaturedAppRight,
  * oldest first, then finalize for every day those snapshots bound. It also
  * repairs any day whose snapshot the forward collector missed, so it stays
- * scheduled after the first release. ValidatorLicense history is not read by
- * the day reads (the license history backfill is planned). A completion pass run after the day reads
- * (licensePass) reads the ValidatorLicense count of stored rows that lack it,
- * oldest first, at the row's own record time, host and migration, and owes the
- * day a finalize; three failed reads that are not outages give a day up
+ * scheduled after the first release. The day reads do not read
+ * ValidatorLicense history (its backfill is planned). A completion pass run
+ * after the day reads (licensePass) reads the ValidatorLicense count of stored
+ * rows that lack it, oldest first, at the row's own record time, host and
+ * migration, and owes the day a finalize; three failed reads that are not outages give a day up
  * (detail.license_attempts), and each such failure holds the day back for
  * BACKFILL_RETRY_MS (detail.license_failed_at), as the day reads are spaced,
  * so a bad half hour cannot spend a day's three attempts.
@@ -47,9 +47,8 @@
  * snapshot bounds is owed on CURSOR_BACKFILL (detail.finalize_owed) from just
  * before the insert that stores it until its finalizeDate returns, so a held
  * lock, the job's slot, a finalize that throws, an insert that commits and
- * then answers an error, or a restart mid-run
- * leaves it to a later run: a day older than the finalize window has no other
- * writer. An owed day is finalized only once both snapshots that bound it
+ * then answers an error, or a restart mid-run leaves it to a later run: a day
+ * older than the finalize window has no other writer. An owed day is finalized only once both snapshots that bound it
  * are stored (or given up): finalized earlier, past its deadline it would
  * publish final nulls that the missing boundary's arrival then revises. Each
  * run also owes every bounded day older than the finalize window that has no

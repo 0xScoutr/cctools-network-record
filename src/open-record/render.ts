@@ -155,8 +155,8 @@ export function buildModel(values: ValueRow[], gaps: GapRow[], revisions: Revisi
     }
     day.set(v.series, v);
   }
-  // Gaps and revisions of days before the published range stay out too
-  //.
+  // Gaps and revisions of days before the published range stay out too, so
+  // moving RECORD_FIRST_DATE later takes those days out of every file.
   const inRange = gaps.filter((g) => g.date >= RECORD_FIRST_DATE);
   // The range starts at RECORD_FIRST_DATE, not at the first stored day, and
   // ends at the last day with a stored value or gap, so daily.csv lists every

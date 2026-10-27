@@ -54,9 +54,8 @@ describe("supabaseRecordReader", () => {
   });
 
   it("pages every table on a unique order, so no row repeats or drops between pages", async () => {
-    // A resolved gap and its recurrence share (date, series, reason_code)
-    //: without the id, rows tied on the order can swap
-    // between two page reads.
+    // A resolved gap and its recurrence can share (date, series, reason_code):
+    // without the id, rows tied on the order can swap between two page reads.
     for (const read of ["values", "gaps", "revisions"] as const) {
       const { admin, calls } = pagingAdmin(0);
       await supabaseRecordReader(admin)[read]();

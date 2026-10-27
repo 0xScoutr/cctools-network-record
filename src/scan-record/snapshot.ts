@@ -1,6 +1,6 @@
 /**
- * The snapshot series of day D, from the one ACS snapshot at D+1 00:00:00Z
- *. Forward collection reads it once a day from 00:15 UTC; the
+ * The snapshot series of day D come from the one ACS snapshot at
+ * D+1 00:00:00Z. Forward collection reads it once a day from 00:15 UTC; the
  * backfill reads the same thing for past days, so both share one method.
  */
 

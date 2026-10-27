@@ -253,9 +253,9 @@ export async function collectorLossAlerts(r: ForwardResult): Promise<void> {
 
 /**
  * Finalize (the hourly finalize job, at :35). Armed from its first run:
- * finalize makes no Scan calls, so the collector's duty cycle does not apply
- *. Every run that claims FINALIZE_LOCK reports the same
- * ids, one per series of the due day and "run": checkFeedHealth keeps only
+ * finalize makes no Scan calls, so the collector's duty cycle does not apply.
+ * Every run that claims FINALIZE_LOCK reports the same ids, one per series of
+ * the due day and "run": checkFeedHealth keeps only
  * the ids it is given, so an id left out of one run would lose its streak and
  * its latch. The lock has its own key (FINALIZE_LOCK_HEALTH).
  */

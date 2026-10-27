@@ -52,8 +52,8 @@ export function supabaseRecordReader(admin: Admin): RecordReader {
         "date, series, value::text, status, source_host, method, as_of, retrieved_at, finalized_at, revision, revised_at",
         ["date", "series"],
       ),
-    // A resolved gap and its recurrence share (date, series, reason_code)
-    //, so the id breaks the tie.
+    // A resolved gap and its recurrence can share (date, series, reason_code),
+    // so the id breaks the tie.
     gaps: () =>
       readAll<GapRow>(
         admin,

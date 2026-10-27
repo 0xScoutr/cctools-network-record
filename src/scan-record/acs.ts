@@ -1,6 +1,6 @@
 /**
- * The snapshot series, all read from the one ACS snapshot at D+1 00:00:00Z
- *, so forward collection and backfill share one method.
+ * The snapshot series are all read from the one ACS snapshot at D+1 00:00:00Z,
+ * so forward collection and backfill share one method.
  */
 
 export const TEMPLATES = {
