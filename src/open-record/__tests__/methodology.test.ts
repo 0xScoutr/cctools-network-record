@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ROUND_TOTALS_SERIES_VERIFIED } from "../../scan-record/config";
 import {
@@ -220,7 +222,7 @@ describe("methodology.json's reproducibility section says what status.json lists
     expect(Number(listing![2])).toBe(status.generations.length);
   });
 
-  it("says the day files are counted with their first and last dates, not hashed, and that each one's ETag is its sha256", async () => {
+  it("says the day files are counted with their first and last dates, not hashed, and that each one's ETag is its body's sha256", async () => {
     const { status, stored, paragraph } = await published();
     const days = [...stored.values()].filter((f) => DAY_FILE_RE.test(f.path)).sort((a, b) => a.path.localeCompare(b.path));
     expect(days).toHaveLength(2);
@@ -229,10 +231,19 @@ describe("methodology.json's reproducibility section says what status.json lists
       first: DAY_FILE_RE.exec(days[0].path)![1],
       last: DAY_FILE_RE.exec(days[days.length - 1].path)![1],
     });
+    // The origin's ETag is the stored body's sha256 (publish.ts), strong; the edge may weaken it when it compresses (serve.ts etagMatches).
     for (const f of days) expect(dataHeaders(f).ETag).toBe(`"${sha256Hex(f.body)}"`);
 
     expect(paragraph).toContain(
-      "For the day files it gives their count and their first and last dates, not their sha256: each day file is served with its own sha256 as its ETag.",
+      "For the day files it gives their count and their first and last dates, not their sha256: each day file is served with the sha256 of its uncompressed body as its ETag, which the edge may mark weak (W/).",
     );
+  });
+
+  it("matches the recorded day files: each arrived through the edge with its decompressed body's sha256 as a weak ETag", () => {
+    const dir = join(process.cwd(), "fixtures", "verify", "2026-10-25", "published");
+    const headers = JSON.parse(readFileSync(join(dir, "headers.json"), "utf-8")) as Record<string, { etag: string | null }>;
+    const days = Object.keys(headers).filter((path) => DAY_FILE_RE.test(path));
+    expect(days.length).toBeGreaterThan(0);
+    for (const path of days) expect(headers[path].etag, path).toBe(`W/"${sha256Hex(readFileSync(join(dir, path), "utf-8"))}"`);
   });
 });

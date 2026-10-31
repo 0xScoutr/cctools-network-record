@@ -204,7 +204,8 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
       title: "Reproducibility",
       paragraphs: [
         // What statusDocument (serve.ts) lists: the static files' sha256 in each kept generation (publish.ts), the day files only counted.
-        `first_round and last_round let anyone recompute a day's issuance from Scan. status.json lists the sha256 of ${STATIC_FILES.slice(0, -1).join(", ")} and ${STATIC_FILES[STATIC_FILES.length - 1]} for each of the last 24 generations. For the day files it gives their count and their first and last dates, not their sha256: each day file is served with its own sha256 as its ETag.`,
+        // A day file's ETag is the stored body's sha256 (dataHeaders); the edge may weaken it when it compresses (serve.ts etagMatches).
+        `first_round and last_round let anyone recompute a day's issuance from Scan. status.json lists the sha256 of ${STATIC_FILES.slice(0, -1).join(", ")} and ${STATIC_FILES[STATIC_FILES.length - 1]} for each of the last 24 generations. For the day files it gives their count and their first and last dates, not their sha256: each day file is served with the sha256 of its uncompressed body as its ETag, which the edge may mark weak (W/).`,
       ],
     },
     {
