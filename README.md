@@ -21,7 +21,7 @@ CC BY 4.0:
 | `days/YYYY-MM-DD.json` | one day, with its citation ([example](https://api.cctools.network/api/open/network-record/v1/days/2026-10-25.json)) |
 | [datapackage.json](https://api.cctools.network/api/open/network-record/v1/datapackage.json) | Frictionless Data Package: fields, units, license, sources |
 | [methodology.json](https://api.cctools.network/api/open/network-record/v1/methodology.json) | the methodology, rendered from the same code |
-| [status.json](https://api.cctools.network/api/open/network-record/v1/status.json) | freshness, and the sha256 of every file for the last 24 generations |
+| [status.json](https://api.cctools.network/api/open/network-record/v1/status.json) | freshness; the sha256 of every file above but the day files, for each of the last 24 generations; the day files' count and first and last dates (a day file's sha256 is the ETag it is served with) |
 
 The human-readable record is at <https://cctools.network/network>.
 

@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { ROUND_TOTALS_SERIES_VERIFIED } from "../../scan-record/config";
-import { FRESHNESS, LICENSE_SCOPE, SERIES, TRADEMARK_NOTICE } from "../contract";
+import {
+  DAY_FILE_RE,
+  FRESHNESS,
+  LICENSE_SCOPE,
+  RECORD_FIRST_DATE,
+  SERIES,
+  STATIC_FILES,
+  TRADEMARK_NOTICE,
+  addDays,
+  type Manifest,
+  type StoredFile,
+  type ValueRow,
+} from "../contract";
 import { renderMethodology } from "../methodology";
-import { buildModel } from "../render";
+import { publishRecord, type FileCache, type RecordReader } from "../publish";
+import { buildModel, sha256Hex } from "../render";
+import { dataHeaders, statusDocument } from "../serve";
 import { fullDay } from "./helpers/rows";
 
 const doc = JSON.parse(renderMethodology(buildModel(fullDay("2026-10-05"), [], []), ["api.cantonnodes.com"], "g1"));
@@ -148,5 +162,77 @@ describe("methodology.json, the Methodology page content source", () => {
   it("states freshness as a target until the burn-in is measured", () => {
     expect(text).toContain("target");
     expect(text).not.toContain("commitment:");
+  });
+});
+
+/**
+ * The reproducibility section against the status.json that publish.ts and serve.ts build: thirty renders that each
+ * change a value, so the manifest is past its generation cap, then the methodology.json the last one left stored.
+ */
+async function published() {
+  const d0 = RECORD_FIRST_DATE;
+  const d1 = addDays(d0, 1);
+  const state = { values: [] as ValueRow[], dirty: "", manifest: null as Manifest | null, stored: new Map<string, StoredFile>() };
+  const reader: RecordReader = {
+    values: async () => state.values,
+    gaps: async () => [],
+    revisions: async () => [],
+    dirtyAt: async () => state.dirty,
+  };
+  const cache: FileCache = {
+    manifest: async () => (state.manifest ? { status: "hit", value: state.manifest } : { status: "miss" }),
+    putFiles: async (files) => {
+      for (const f of files) state.stored.set(f.path, f);
+    },
+    putManifest: async (m) => {
+      state.manifest = m;
+    },
+  };
+  const start = Date.parse("2026-10-06T02:40:00Z");
+  for (let i = 0; i < 30; i++) {
+    state.values = [...fullDay(d0), ...fullDay(d1, "final", { featured_apps: `${130 + i}.0000000000` })];
+    state.dirty = `d${i}`;
+    await publishRecord({ reader, cache, now: new Date(start + i * 3_600_000) });
+  }
+  const status = statusDocument(state.manifest!, start + 30 * 3_600_000);
+  const methodology = JSON.parse(state.stored.get("methodology.json")!.body);
+  const paragraph: string = methodology.sections.find((s: { id: string }) => s.id === "reproducibility").paragraphs.join(" ");
+  return { status, stored: state.stored, paragraph };
+}
+
+describe("methodology.json's reproducibility section says what status.json lists", () => {
+  it("names exactly the files status.json gives a sha256 for, and the number of generations it keeps", async () => {
+    const { status, paragraph } = await published();
+    const hashed = [
+      ...new Set([
+        ...Object.entries(status.files).filter(([, f]) => typeof f.sha256 === "string").map(([path]) => path),
+        ...status.generations.flatMap((g) => Object.keys(g.files)),
+      ]),
+    ].sort();
+    expect(hashed).toEqual([...STATIC_FILES].sort());
+    expect(hashed.filter((path) => DAY_FILE_RE.test(path))).toEqual([]);
+    expect(status.generations).toHaveLength(24);
+
+    expect(paragraph).not.toMatch(/every file/i);
+    const listing = /status\.json lists the sha256 of (.+?) for each of the last (\d+) generations\./.exec(paragraph);
+    expect(listing, paragraph).not.toBeNull();
+    expect((listing![1].match(/[\w-]+\.(?:csv|json)/g) ?? []).sort()).toEqual(hashed);
+    expect(Number(listing![2])).toBe(status.generations.length);
+  });
+
+  it("says the day files are counted with their first and last dates, not hashed, and that each one's ETag is its sha256", async () => {
+    const { status, stored, paragraph } = await published();
+    const days = [...stored.values()].filter((f) => DAY_FILE_RE.test(f.path)).sort((a, b) => a.path.localeCompare(b.path));
+    expect(days).toHaveLength(2);
+    expect(status.day_files).toEqual({
+      count: days.length,
+      first: DAY_FILE_RE.exec(days[0].path)![1],
+      last: DAY_FILE_RE.exec(days[days.length - 1].path)![1],
+    });
+    for (const f of days) expect(dataHeaders(f).ETag).toBe(`"${sha256Hex(f.body)}"`);
+
+    expect(paragraph).toContain(
+      "For the day files it gives their count and their first and last dates, not their sha256: each day file is served with its own sha256 as its ETag.",
+    );
   });
 });
