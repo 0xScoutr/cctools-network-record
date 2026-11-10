@@ -20,6 +20,7 @@ import {
   type GivenUpLatch,
 } from "./collector";
 import { ALARM_STATES, dueSeriesOk, type FinalizeResult } from "./finalize";
+import { isSvScanHost } from "./scan-budget";
 import type { CursorRow } from "./store";
 
 export const COLLECTOR_HEALTH: FeedHealthConfig = {
@@ -58,6 +59,38 @@ export function collectorAlertPolicy(overrides: CursorRow | null): FeedHealthCon
   const n = Number(raw.fail_threshold);
   const failThreshold = Number.isInteger(n) && n >= 2 ? Math.min(n, COLLECTOR_MAX_FAIL_THRESHOLD) : COLLECTOR_HEALTH.failThreshold;
   return { ...COLLECTOR_HEALTH, failThreshold, downWindow: `~${failThreshold * 5}min` };
+}
+
+/**
+ * Whether the record still reads a Super Validator. One Super Validator failing
+ * over to another is the normal case and pages nobody (they upgrade one by one);
+ * half an hour on another host (the public one last in the list) does, once,
+ * and once more when it comes back. Independent of the collector's arming: it
+ * only exists once the Scan host list names a Super Validator.
+ */
+export const SCAN_SOURCE_HEALTH: FeedHealthConfig = {
+  stateKey: "feed-health:scan-source",
+  cacheSource: "network-record-collector",
+  failThreshold: 6,
+  downWindow: "~30min",
+  downTitle: "The open record is reading a public Scan host, not a Super Validator",
+  recoveredTitle: "The open record is back on a Super Validator",
+  page: true,
+  action: () =>
+    "It keeps collecting, and every value names the host that served. If the line says a 429 closed them, the backoff is holding on purpose: see what else reads Super Validators from the same IP before anything else. Otherwise check the forward (SCAN_FORWARD_PORTS) and the reach of the allowlisted IP to the Super Validators.",
+};
+
+export function scanSourceOutcomes(
+  configuredHosts: readonly string[],
+  last: { host: string; at: string } | null,
+  /** When a 429 closed the Super Validators until, if it did. */
+  closedUntil: string | null = null,
+): FeedOutcome[] {
+  if (!configuredHosts.some(isSvScanHost)) return [];
+  const base = { id: "scan-source", label: "Scan source of the open record" };
+  if (last === null) return [{ ...base, ok: true, skipped: true, detail: "no read lately" }];
+  const gate = closedUntil === null ? "" : `; every Super Validator closed until ${closedUntil} after a 429`;
+  return [{ ...base, ok: isSvScanHost(last.host), detail: `${last.host}, read at ${last.at}${gate}` }];
 }
 
 /**

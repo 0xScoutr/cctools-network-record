@@ -1,3 +1,4 @@
+import { scanSourceOutcomes } from "../health";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cache = new Map<string, unknown>();
@@ -66,6 +67,36 @@ beforeEach(() => {
   alerts.length = 0;
   pages.length = 0;
   delivered = true;
+});
+
+describe("scanSourceOutcomes", () => {
+  const SV = "scan.sv-9.global.canton.network.example.invalid";
+  const list = [SV, "api.cantonnodes.com"];
+
+  it("has nothing to say while the list names no Super Validator", () => {
+    expect(scanSourceOutcomes(["api.cantonnodes.com"], { host: "api.cantonnodes.com", at: "2026-11-08T00:00:00Z" })).toEqual([]);
+  });
+
+  it("counts nothing when no read happened lately", () => {
+    expect(scanSourceOutcomes(list, null)).toEqual([expect.objectContaining({ id: "scan-source", skipped: true })]);
+  });
+
+  it("is fine on any Super Validator, the first or another", () => {
+    expect(scanSourceOutcomes(list, { host: SV, at: "2026-11-08T00:00:00Z" })).toEqual([expect.objectContaining({ ok: true })]);
+    expect(scanSourceOutcomes(list, { host: "scan.sv-1.global.canton.network.other.invalid", at: "2026-11-08T00:00:00Z" })[0].ok).toBe(true);
+  });
+
+  it("says when a 429 closed the Super Validators, since that is hours, not minutes", () => {
+    const [o] = scanSourceOutcomes(list, { host: "api.cantonnodes.com", at: "2026-11-08T00:00:00Z" }, "2026-11-08T06:00:00.000Z");
+    expect(o.detail).toContain("closed until 2026-11-08T06:00:00.000Z after a 429");
+  });
+
+  it("fails on a public host, naming it and when", () => {
+    const [o] = scanSourceOutcomes(list, { host: "api.cantonnodes.com", at: "2026-11-08T00:00:00Z" });
+    expect(o.ok).toBe(false);
+    expect(o.detail).toContain("api.cantonnodes.com");
+    expect(o.detail).toContain("2026-11-08T00:00:00Z");
+  });
 });
 
 describe("collectorOutcomes", () => {
