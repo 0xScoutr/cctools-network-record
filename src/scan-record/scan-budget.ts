@@ -74,7 +74,7 @@ export const SCAN_BUDGET = {
   gateFallbackMs: 30_000,
   gateMinMs: 5_000,
   gateMaxMs: 3_600_000,
-  /** The least time between two starts on the Super Validators, whatever is configured. 20 calls at one a second all answered 200 (06/11), so this keeps a margin. */
+  /** The least time between two starts on the Super Validators, whatever is configured. 20 calls at one a second all answered 200 (2026-11-06), so this keeps a margin. */
   svSpacingFloorMs: 2_000,
   /** How long a Super Validator Scan stays out of the rotation after it failed in a way other than a 429. */
   svHostDownMs: 60_000,

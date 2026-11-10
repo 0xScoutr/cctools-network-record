@@ -53,7 +53,10 @@ describe("the offline verify of the recorded day", () => {
     }
     for (const name of prose) {
       expect(report.checks.find((x) => x.part === "files" && x.name === name)?.status, name).toBe("ok");
-      expect(["ok", "warn"], name).toContain(report.checks.find((x) => x.part === "render" && x.name === name)?.status);
+      const render = report.checks.find((x) => x.part === "render" && x.name === name);
+      expect(render?.status, name).toBe("warn");
+      // The first difference is the one expected, the operator's facts now dated: a prose change above it fails here.
+      expect(render?.detail, name).toContain("its site, read on 2026-09-");
     }
     // Every value Scan can serve again is re-derived from it; the two supply
     // series are reported apart, as inputs (supply_cc) and arithmetic on them.

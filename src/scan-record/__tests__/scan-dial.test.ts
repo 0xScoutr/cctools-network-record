@@ -109,10 +109,13 @@ afterEach(() => {
 
 afterAll(async () => {
   https.globalAgent.options.ca = previousCa;
-  server.closeAllConnections();
-  otherNameServer.closeAllConnections();
-  await Promise.all([new Promise((r) => server.close(r)), new Promise((r) => otherNameServer.close(r))]);
-  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  try {
+    // Either server is absent when beforeAll failed before it listened.
+    for (const s of [server, otherNameServer]) s?.closeAllConnections();
+    await Promise.all([server, otherNameServer].filter(Boolean).map((s) => new Promise((r) => s.close(r))));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  }
 });
 
 describe("scanForwardPorts", () => {
@@ -123,6 +126,20 @@ describe("scanForwardPorts", () => {
 
   it.each(["no-port", "a=80", "a=1023", "a=65536", "a=70000", "a=b", "a=1=2", "=1024"])("refuses %s", (entry) => {
     expect(() => scanForwardPorts(entry)).toThrow(/SCAN_FORWARD_PORTS/);
+  });
+
+  it("names a bad entry by its host, never by its port", () => {
+    expect(() => scanForwardPorts(`${NAME}=99999`)).toThrow(`SCAN_FORWARD_PORTS has an entry for ${NAME} that is not host=port`);
+    for (const entry of [`${NAME}=99999`, `${NAME}=1024=1025`, "=1024"]) {
+      let message = "";
+      try {
+        scanForwardPorts(entry);
+      } catch (err) {
+        message = (err as Error).message;
+      }
+      expect(message, entry).toMatch(/SCAN_FORWARD_PORTS/);
+      expect(message, entry).not.toMatch(/99999|1024|1025/);
+    }
   });
 });
 

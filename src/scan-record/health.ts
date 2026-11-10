@@ -20,7 +20,7 @@ import {
   type GivenUpLatch,
 } from "./collector";
 import { ALARM_STATES, dueSeriesOk, type FinalizeResult } from "./finalize";
-import { isSvScanHost } from "./scan-budget";
+import { hostOf, isSvScanHost } from "./scan-budget";
 import type { CursorRow } from "./store";
 
 export const COLLECTOR_HEALTH: FeedHealthConfig = {
@@ -80,13 +80,14 @@ export const SCAN_SOURCE_HEALTH: FeedHealthConfig = {
     "It keeps collecting, and every value names the host that served. If the line says a 429 closed them, the backoff is holding on purpose: see what else reads Super Validators from the same IP before anything else. Otherwise check the forward (SCAN_FORWARD_PORTS) and the reach of the allowlisted IP to the Super Validators.",
 };
 
+/** `configuredHosts` may be host names or the Scan host list's URLs (scanRecordHosts()). */
 export function scanSourceOutcomes(
   configuredHosts: readonly string[],
   last: { host: string; at: string } | null,
   /** When a 429 closed the Super Validators until, if it did. */
   closedUntil: string | null = null,
 ): FeedOutcome[] {
-  if (!configuredHosts.some(isSvScanHost)) return [];
+  if (!configuredHosts.some((h) => isSvScanHost(hostOf(h)))) return [];
   const base = { id: "scan-source", label: "Scan source of the open record" };
   if (last === null) return [{ ...base, ok: true, skipped: true, detail: "no read lately" }];
   const gate = closedUntil === null ? "" : `; every Super Validator closed until ${closedUntil} after a 429`;

@@ -79,7 +79,7 @@ describe("methodology.json, the Methodology page content source", () => {
     const sources = doc.sections.find((s: { id: string }) => s.id === "sources");
     expect(JSON.stringify(sources)).toContain("Proof Group");
     expect(JSON.stringify(sources)).toContain("no published terms of service or data license");
-    // A third party's own facts carry the day they were read, since its site can change (flip review round 2, 04/11).
+    // A third party's own facts carry the day they were read, since its site can change.
     expect(JSON.stringify(sources)).toContain("its site, read on 2026-09-25, describes a commercial service whose free tier is rate limited");
     const downloads = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "downloads"));
     expect(downloads).toContain(LICENSE_SCOPE);

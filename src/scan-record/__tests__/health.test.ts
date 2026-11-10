@@ -86,6 +86,12 @@ describe("scanSourceOutcomes", () => {
     expect(scanSourceOutcomes(list, { host: "scan.sv-1.global.canton.network.other.invalid", at: "2026-11-08T00:00:00Z" })[0].ok).toBe(true);
   });
 
+  it("takes the Scan host list's URLs as well as host names", () => {
+    const urls = [`https://${SV}/api/scan`, "https://api.cantonnodes.com"];
+    expect(scanSourceOutcomes(urls, { host: "api.cantonnodes.com", at: "2026-11-08T00:00:00Z" })).toEqual([expect.objectContaining({ ok: false })]);
+    expect(scanSourceOutcomes(["https://api.cantonnodes.com"], null)).toEqual([]);
+  });
+
   it("says when a 429 closed the Super Validators, since that is hours, not minutes", () => {
     const [o] = scanSourceOutcomes(list, { host: "api.cantonnodes.com", at: "2026-11-08T00:00:00Z" }, "2026-11-08T06:00:00.000Z");
     expect(o.detail).toContain("closed until 2026-11-08T06:00:00.000Z after a 429");

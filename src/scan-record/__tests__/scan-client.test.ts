@@ -20,6 +20,7 @@ vi.mock("../../runtime/shared-cache", () => ({
   sharedSet: (k: string, v: unknown) => void shared.set(k, v),
 }));
 
+import { configureScan } from "../../runtime/scan-settings";
 import { ScanBusyError } from "../scan-budget";
 import {
   ScanHttpError,
@@ -218,6 +219,19 @@ describe("scanRequest", () => {
       expect(calls[0].url).toBe(`https://${SV_A}/api/scan/v2/updates`);
       expect(r.host).toBe(SV_A);
       expect(releaseScanSlot).toHaveBeenCalledWith(SV_A);
+    });
+
+    it("checks a host list given through the settings the same way", async () => {
+      respond(json({}));
+      for (const host of [`https://${SV_A}`, `https://${SV_A}:8443/api/scan`]) {
+        configureScan({ hosts: [host] });
+        try {
+          await expect(scanRequest("/v0/dso", { method: "GET", cls: "record" })).rejects.toThrow(/Scan host list entry/);
+        } finally {
+          configureScan({});
+        }
+      }
+      expect(calls).toHaveLength(0);
     });
 
     it("refuses a Super Validator entry without the prefix, or with a port, without dialling", async () => {

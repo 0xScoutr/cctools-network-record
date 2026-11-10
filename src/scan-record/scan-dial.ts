@@ -27,7 +27,8 @@ export function scanForwardPorts(raw = process.env.SCAN_FORWARD_PORTS ?? ""): Ma
     const [host, port, ...rest] = entry.split("=");
     const n = Number(port);
     if (!host || rest.length > 0 || !Number.isInteger(n) || n < 1024 || n > 65535) {
-      throw new Error(`SCAN_FORWARD_PORTS entry "${entry}" is not host=port with an unprivileged port`);
+      // The host only: the port is the operator's and never leaves this module.
+      throw new Error(`SCAN_FORWARD_PORTS has an entry${host ? ` for ${host}` : ""} that is not host=port with an unprivileged port`);
     }
     ports.set(host, n);
   }

@@ -183,7 +183,7 @@ describe("ACS reads: /v2/state/acs first, /v0/state/acs only where v2 is not ser
     expect((await liveScanApi("record").acsSnapshot(4, AT, FEATURED)).endpoint).toBe(V2);
   });
 
-  it("reads the Mirror's real answer for a record time with no snapshot as the endpoint's own, never as v2 absent", async () => {
+  it("reads api.cantonnodes.com's real answer for a record time with no snapshot as the endpoint's own, never as v2 absent", async () => {
     expect(JSON.parse(NO_SNAPSHOT_BODY)).toEqual({ error: "Failed to find ACS snapshot for migration id 4 at 2026-10-05T00:00:01Z" });
     expect(acsEndpointAbsent(new ScanHttpError(HOST_A, V2, 404, NO_SNAPSHOT_BODY))).toBe(false);
     queue(noSnapshot());
