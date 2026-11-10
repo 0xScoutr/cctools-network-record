@@ -4,7 +4,12 @@
  *
  *   pacedFetch      the live one: request starts spaced apart, and a 429 or
  *                   a dropped connection waited out and retried, because a
- *                   public Scan host rate limits per client IP.
+ *                   public Scan host rate limits per client IP. It dials
+ *                   through scanDial, so a host named in SCAN_FORWARD_PORTS
+ *                   goes through its forward. On a Super Validator Scan it
+ *                   retries nothing: the 429 or the failure goes back to the
+ *                   Scan client, whose budget closes the Super Validators
+ *                   (scan-record/scan-budget.ts).
  *   recordingFetch  wraps another fetch and keeps every answer on a tape.
  *   replayFetch     answers from a tape, for the offline run: the same Scan
  *                   client code runs on the same answers, with no network.
@@ -29,7 +34,9 @@
 
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import { hostOf, isSvScanHost, type ScanCallClass } from "../scan-record/scan-budget";
 import { SCAN_TIMEOUT_MS } from "../scan-record/scan-client";
+import { scanDial } from "../scan-record/scan-dial";
 
 export interface TapeEntry {
   method: string;
@@ -65,6 +72,16 @@ function isAbort(err: unknown): boolean {
  */
 export const DEFAULT_SPACING_MS = 20_000;
 
+/**
+ * The budget class of a verification's Scan reads (scan-budget.ts). A
+ * verification is a batch of reads, not an interactive request: on a Super
+ * Validator Scan "cron" waits for the one place in flight and the floor
+ * between starts, where "user" is refused as soon as a start is not yet due,
+ * which ends the run at its second request. On any other host the two are the
+ * same: never held, never refused.
+ */
+export const VERIFY_SCAN_CLASS: ScanCallClass = "cron";
+
 export interface PacedFetchOptions {
   /** Least time between two request starts; DEFAULT_SPACING_MS when absent. */
   spacingMs?: number;
@@ -72,16 +89,21 @@ export interface PacedFetchOptions {
   retries: number;
   /** Wait before a retry when the host names no Retry-After. */
   backoffMs: number;
+  /** Default scanDial. */
   send?: typeof fetch;
   log?: (line: string) => void;
 }
 
-/** A fetch that spaces its starts and waits out throttles. Each attempt gets its own timeout. */
+/**
+ * A fetch that spaces its starts and waits out throttles. Each attempt gets its own timeout. A Super Validator Scan's
+ * 429 or dropped connection is returned or thrown at once, never retried here.
+ */
 export function pacedFetch(opts: PacedFetchOptions): typeof fetch {
   const spacingMs = opts.spacingMs ?? DEFAULT_SPACING_MS;
   let nextStart = 0;
-  const send = opts.send ?? ((input, init) => fetch(input, init));
+  const send = opts.send ?? ((input, init) => scanDial(urlOf(input), init ?? {}));
   return (async (input: string | URL | Request, init?: RequestInit) => {
+    const sv = isSvScanHost(hostOf(urlOf(input)));
     for (let attempt = 0; ; attempt++) {
       const wait = nextStart - Date.now();
       if (wait > 0) await sleep(wait);
@@ -90,12 +112,12 @@ export function pacedFetch(opts: PacedFetchOptions): typeof fetch {
       try {
         res = await send(input, { ...init, signal: AbortSignal.timeout(SCAN_TIMEOUT_MS) });
       } catch (err) {
-        if (isAbort(err) || attempt >= opts.retries) throw err;
+        if (isAbort(err) || sv || attempt >= opts.retries) throw err;
         opts.log?.(`connection dropped (${err instanceof Error ? err.message : String(err)}); retrying in ${opts.backoffMs / 1000} s`);
         nextStart = Date.now() + opts.backoffMs;
         continue;
       }
-      if (res.status !== 429 || attempt >= opts.retries) return res;
+      if (res.status !== 429 || sv || attempt >= opts.retries) return res;
       const seconds = Number(res.headers.get("retry-after"));
       const waitMs = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : opts.backoffMs;
       await res.body?.cancel().catch(() => undefined);

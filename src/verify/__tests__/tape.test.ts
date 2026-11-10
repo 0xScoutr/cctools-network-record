@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SPACING_MS, pacedFetch, recordingFetch, reduceAcsPage, reduceUpdatesPage, replayFetch, type TapeEntry } from "../tape";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { configureScan } from "../../runtime/scan-settings";
+import { memorySharedCache, setSharedCacheBackend, type SharedCacheBackend } from "../../runtime/shared-cache";
+import { liveScanApi } from "../../scan-record/scan-client";
+import { DEFAULT_SPACING_MS, pacedFetch, recordingFetch, reduceAcsPage, reduceUpdatesPage, replayFetch, VERIFY_SCAN_CLASS, type TapeEntry } from "../tape";
 
 const tx = (id: string, at: string, choice?: string) => ({
   update_id: id,
@@ -98,6 +101,85 @@ describe("pacedFetch", () => {
     const send = (async () => new Response("", { status: 429 })) as unknown as typeof fetch;
     const f = pacedFetch({ spacingMs: 0, retries: 1, backoffMs: 1, send });
     expect((await f("https://scan.example.invalid/x")).status).toBe(429);
+  });
+
+  describe("on a Super Validator Scan", () => {
+    const SV = "https://scan.sv-1.global.canton.network.example.invalid/api/scan";
+
+    it("hands a 429 back at once, for the Scan client's budget to close them all", async () => {
+      let sent = 0;
+      const send = (async () => {
+        sent++;
+        return new Response("", { status: 429, headers: { "retry-after": "0" } });
+      }) as unknown as typeof fetch;
+      const f = pacedFetch({ spacingMs: 0, retries: 6, backoffMs: 1, send });
+      expect((await f(`${SV}/v0/dso`)).status).toBe(429);
+      expect(sent).toBe(1);
+    });
+
+    it("throws a dropped connection at once", async () => {
+      let sent = 0;
+      const send = (async () => {
+        sent++;
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch;
+      const f = pacedFetch({ spacingMs: 0, retries: 6, backoffMs: 1, send });
+      await expect(f(`${SV}/v0/dso`)).rejects.toThrow("fetch failed");
+      expect(sent).toBe(1);
+    });
+  });
+
+  it("dials through scanDial by default: a plain fetch for a host with no forward", async () => {
+    const stub = vi.fn(async (_url: string, _init?: RequestInit) => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", stub);
+    try {
+      const res = await pacedFetch({ spacingMs: 0, retries: 0, backoffMs: 1 })("https://scan.example.invalid/v0/dso", { method: "GET" });
+      expect(res.status).toBe(200);
+      expect(stub).toHaveBeenCalledTimes(1);
+      expect(stub.mock.calls[0][0]).toBe("https://scan.example.invalid/v0/dso");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("a verification's budget class on a Super Validator Scan", () => {
+  const SV = "https://scan.sv-1.global.canton.network.example.invalid/api/scan";
+  let previous: SharedCacheBackend;
+
+  beforeEach(() => {
+    // A fresh process's budget for each run.
+    previous = setSharedCacheBackend(memorySharedCache());
+  });
+
+  afterEach(() => {
+    configureScan({});
+    setSharedCacheBackend(previous);
+  });
+
+  /** Two reads in a row, as a verification makes them; how many reached the host. */
+  async function twoReads(cls: Parameters<typeof liveScanApi>[0]): Promise<number> {
+    let sent = 0;
+    configureScan({
+      hosts: [SV],
+      fetch: (async () => {
+        sent++;
+        return new Response(JSON.stringify({ open_mining_rounds: {}, issuing_mining_rounds: {} }), { status: 200 });
+      }) as typeof fetch,
+    });
+    const scan = liveScanApi(cls);
+    for (let i = 0; i < 2; i++) await scan.openAndIssuing().catch(() => undefined);
+    return sent;
+  }
+
+  it("is one that waits its turn, so a run goes past its second request", async () => {
+    expect(VERIFY_SCAN_CLASS).toBe("cron");
+    expect(await twoReads(VERIFY_SCAN_CLASS)).toBe(2);
+  });
+
+  it("is not the interactive class, which is refused at the second request", async () => {
+    // The fresh process's budget: the first start set the next one 2 s later.
+    expect(await twoReads("user")).toBe(1);
   });
 });
 

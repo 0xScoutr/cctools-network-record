@@ -21,7 +21,7 @@ import { OPEN_BASE_URL } from "../open-record/contract";
 import { configureScan } from "../runtime/scan-settings";
 import { liveScanApi } from "../scan-record/scan-client";
 import { dirPublished, httpPublished, recordingPublished, type PublishedSource } from "./published";
-import { DEFAULT_SPACING_MS, pacedFetch, readTape, recordingFetch, replayFetch, writeTape, type TapeEntry } from "./tape";
+import { DEFAULT_SPACING_MS, pacedFetch, readTape, recordingFetch, replayFetch, VERIFY_SCAN_CLASS, writeTape, type TapeEntry } from "./tape";
 import { verifyDay, type Check, type VerifyReport } from "./verify";
 
 const DEFAULT_SCAN_HOST = "https://api.cantonnodes.com";
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     const report = await verifyDay({
       date: meta.date,
       published: dirPublished(dir),
-      scan: meta.scan_host ? liveScanApi("user") : undefined,
+      scan: meta.scan_host ? liveScanApi(VERIFY_SCAN_CLASS) : undefined,
       migrationId: meta.migration_id_arg ?? undefined,
       now: new Date(meta.recorded_at),
       strict: args.strict,
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
   const report = await verifyDay({
     date,
     published,
-    scan: args.skipScan ? undefined : liveScanApi("user"),
+    scan: args.skipScan ? undefined : liveScanApi(VERIFY_SCAN_CLASS),
     migrationId: args.migrationId,
     now: new Date(),
     strict: args.strict,

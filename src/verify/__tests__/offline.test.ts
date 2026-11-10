@@ -10,7 +10,7 @@ import { SERIES_NAMES } from "../../open-record/contract";
 import { configureScan } from "../../runtime/scan-settings";
 import { liveScanApi } from "../../scan-record/scan-client";
 import { dirPublished, type PublishedSource } from "../published";
-import { readTape, replayFetch } from "../tape";
+import { readTape, replayFetch, VERIFY_SCAN_CLASS } from "../tape";
 import { verifyDay } from "../verify";
 
 const DIR = join(process.cwd(), "fixtures", "verify", "2026-10-25");
@@ -27,7 +27,7 @@ async function run(published: PublishedSource) {
   const report = await verifyDay({
     date: meta.date,
     published,
-    scan: liveScanApi("user"),
+    scan: liveScanApi(VERIFY_SCAN_CLASS),
     migrationId: meta.migration_id_arg ?? undefined,
     now: new Date(meta.recorded_at),
   });
@@ -44,8 +44,16 @@ describe("the offline verify of the recorded day", () => {
     expect(report.checks.filter((c) => c.status === "fail")).toEqual([]);
     expect(report.passed).toBe(true);
     expect(replay.unused()).toBe(0);
+    // methodology.json and datapackage.json carry prose rendered from the code, which these copies of 2026-10-27
+    // predate (the Scan host operator's facts were dated on 2026-11-04): a difference in that prose alone is a
+    // warning, and what they state about the data must still match, or the check above would have failed.
+    const prose = ["methodology.json", "datapackage.json"];
     for (const part of ["files", "render"] as const) {
-      for (const c of report.checks.filter((x) => x.part === part && x.name !== "methodology.json")) expect(c.status, c.name).toBe("ok");
+      for (const c of report.checks.filter((x) => x.part === part && !(part === "render" && prose.includes(x.name)))) expect(c.status, c.name).toBe("ok");
+    }
+    for (const name of prose) {
+      expect(report.checks.find((x) => x.part === "files" && x.name === name)?.status, name).toBe("ok");
+      expect(["ok", "warn"], name).toContain(report.checks.find((x) => x.part === "render" && x.name === name)?.status);
     }
     // Every value Scan can serve again is re-derived from it; the two supply
     // series are reported apart, as inputs (supply_cc) and arithmetic on them.
