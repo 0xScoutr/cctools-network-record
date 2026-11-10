@@ -96,8 +96,11 @@ entry ends in `/api/scan`, where its Scan is served
 carries no port. A call asks one host at a time and goes on to the next when
 that host refuses, fails, times out or, on a Super Validator, answers anything
 but a 200 (one whose snapshots lag answers 404 for a day another holds).
-Every value names the host that served it, and each host when a day's rounds
-came from more than one (`source_host` is then comma separated). A day file
+Every value names the host that served it, and every host it rests on when
+there are more (`source_host` is then comma separated): the rounds of a day
+read from two hosts, `first_round` and `rounds` with the previous day's
+snapshot when the range came from the two snapshots, and
+`net_supply_change_cc` with both supply readings. A day file
 whose values name only api.cantonnodes.com keeps the words it was published
 with; a file whose values name another host says the data is derived from
 Canton Scan data instead of from Scan data served publicly by a Super
@@ -119,9 +122,12 @@ whichever job, because a ban earned there would cost the node:
   `Retry-After` wins), and the call goes on to the next host in the list;
 * a host that fails any other way is left out alone, for a minute.
 
-The supply collector reads the registry along the same list, at the root of
-each host, and passes over a Super Validator whose reading is more than four
-hours old. A deployment that lists Super Validators can page when the record
+With a Super Validator in the list, the supply collector reads the registry
+along the same list, at the root of each host, and passes over a Super
+Validator whose reading is more than four hours old; with none, it reads the
+first host's `/registry/metadata/v1`. A Super Validator's registry is read in
+the same budget, never retried, also when it is named on its own
+(`registryBaseUrl`). A deployment that lists Super Validators can page when the record
 has read another host for half an hour (`health.ts`: `SCAN_SOURCE_HEALTH`,
 fed by `scanSourceOutcomes` with `lastScanSource` and `scanGateUntil`).
 
@@ -178,7 +184,8 @@ Splice Scan API can be named with `--scan-host`, with a shorter
 its allowlist (through a forward named in `SCAN_FORWARD_PORTS`, when that is
 how the IP is reached). The command then keeps the Super Validators' budget
 above: one request at a time, at least 2 s between starts, and nothing
-retried, so a 429 ends the run. That budget lives in the command's own
+retried, so a 429, or any other failure, ends the run. That budget lives in
+the command's own
 process, so run it where nothing else reads those Scans from the same IP.
 
 ### Offline
@@ -212,6 +219,9 @@ derivation reads and states what it left out:
   page's last transaction reduced to its `update_id`, `migration_id` and
   `record_time` (where the page ends). The entry keeps how many transactions
   the page had and the sha256 of the body as served.
+
+A tape recorded against a Super Validator replays through that host's budget
+too, at least 2 s a request, so record fixtures against a public host.
 
 A test reads the recorded tape and fails if it holds an e-mail address
 anywhere, or if an event of a counted-only page keeps any field beyond those
@@ -295,7 +305,9 @@ pnpm test
 
 The suite needs no network and no database server: Scan is stubbed or
 replayed, and the Postgres tests run the real schema, its live check and the
-reference adapter in an in-process Postgres (PGlite). CI runs the type check,
+reference adapter in an in-process Postgres (PGlite). The forward's test
+starts a local TLS server, so it needs the `openssl` command, which CI's
+runner has. CI runs the type check,
 the tests and the offline verify on every push. A separate scheduled job,
 `published-record`, needs the network: every day it verifies yesterday's
 published files against this code with `--skip-scan --strict`
