@@ -29,8 +29,9 @@ The human-readable record is at <https://cctools.network/network>.
 
 ```
 src/scan-record/   reading Scan and turning it into a day's values
-  scan-client.ts     Scan HTTP: /v2/updates, /v2/state/acs (v0 as fallback), shape checks
-  scan-budget.ts     one call budget per Scan host: spacing, the shared 429 gate
+  scan-client.ts     Scan HTTP: the host list and its failover, /v2/updates, /v2/state/acs (v0 as fallback), shape checks
+  scan-budget.ts     one call budget per Scan host, and one for every Super Validator Scan: spacing, the shared 429 gate
+  scan-dial.ts       how a call leaves: a plain fetch, or the forward SCAN_FORWARD_PORTS names for its host
   rounds.ts          StartIssuing captures and each round's issuance split
   acs.ts, snapshot.ts the ACS snapshot series at D+1 00:00:00Z
   collector.ts       forward collection every five minutes, with targeted repair
@@ -86,6 +87,44 @@ empty value always has a reason in `gaps.csv`. A final value changes only
 through `revise_network_record()`, which logs the change in `revisions.csv`;
 the schema enforces it.
 
+## Which Scan the record reads
+
+The Scan hosts are a setting, `SCAN_RECORD_HOSTS`: ordered, comma-separated
+https URLs, `https://api.cantonnodes.com` when unset. A Super Validator's
+entry ends in `/api/scan`, where its Scan is served
+(`https://scan.<node>.global.canton.network.<operator>/api/scan`), and
+carries no port. A call asks one host at a time and goes on to the next when
+that host refuses, fails, times out or, on a Super Validator, answers anything
+but a 200 (one whose snapshots lag answers 404 for a day another holds).
+Every value names the host that served it, and each host when a day's rounds
+came from more than one (`source_host` is then comma separated). A day file
+whose values name only api.cantonnodes.com keeps the words it was published
+with; a file whose values name another host says the data is derived from
+Canton Scan data instead of from Scan data served publicly by a Super
+Validator, since a Super Validator's Scan is not public.
+
+That Scan answers only the IPs on its allowlist, and the IP admitted can be a
+validator node's rather than that of the machine that runs the record. A host
+named in `SCAN_FORWARD_PORTS` (`host=port,...`) is dialled at that port on the
+loopback, where a forward through the node listens. TLS stays end to end with
+the Super Validator, and no error names the forward's port. Every Super
+Validator Scan shares one budget (`scan-budget.ts`), whichever is asked and by
+whichever job, because a ban earned there would cost the node:
+
+* one request at a time, across every worker sharing the state;
+* at least 2 s between starts (`SCAN_RECORD_SV_SPACING_MS` can raise it,
+  never lower it);
+* the first 429 from any of them closes all of them for an hour, a second
+  within a week of the first for 6 hours, any later one for 24 hours (a longer
+  `Retry-After` wins), and the call goes on to the next host in the list;
+* a host that fails any other way is left out alone, for a minute.
+
+The supply collector reads the registry along the same list, at the root of
+each host, and passes over a Super Validator whose reading is more than four
+hours old. A deployment that lists Super Validators can page when the record
+has read another host for half an hour (`health.ts`: `SCAN_SOURCE_HEALTH`,
+fed by `scanSourceOutcomes` with `lastScanSource` and `scanGateUntil`).
+
 ## Verify a published day
 
 Requires Node 22, the version CI runs, and pnpm (`package.json` pins its
@@ -122,7 +161,8 @@ and D-1. The report lists both in a section of their own after the Scan
 section, so the Scan section counts only values re-derived from Scan.
 
 The default Scan host is `https://api.cantonnodes.com`, the public host the
-record reads (it is named on every value). It rate limits per client IP, so
+record read alone through 2026-11-06 (every value names its host). It rate
+limits per client IP, so
 the command spaces its requests (`--spacing-ms`, default 20000, 20 s) and
 waits out a 429. Re-deriving one day takes about 215 requests (for
 2026-10-25: the migration id, 8 ACS pages and 206 `/v2/updates` pages), so a
@@ -133,6 +173,13 @@ minute), so about 53 minutes went to waiting out 429s. That rate was measured
 on that run; the host publishes no limit. Any other Scan that serves the
 Splice Scan API can be named with `--scan-host`, with a shorter
 `--spacing-ms` if it allows more.
+
+`--scan-host` can name a Super Validator's Scan, which answers only the IPs on
+its allowlist (through a forward named in `SCAN_FORWARD_PORTS`, when that is
+how the IP is reached). The command then keeps the Super Validators' budget
+above: one request at a time, at least 2 s between starts, and nothing
+retried, so a 429 ends the run. That budget lives in the command's own
+process, so run it where nothing else reads those Scans from the same IP.
 
 ### Offline
 
@@ -234,7 +281,8 @@ them on every run: they are idempotent), then run `sql/check-schema.sql`
 once, which must fail with `RECORD CHECK (rolled back): all checks ok`.
 
 The runtime seams default to one process: `runtime/shared-cache.ts` (the Scan
-gate, the call queue and the job locks) and `runtime/cache-store.ts` keep
+gate, the call queue, the Super Validators' one place in flight and the job
+locks) and `runtime/cache-store.ts` keep
 state in memory, `runtime/alerts.ts` writes alerts to the console. A
 deployment with several workers plugs in shared backends.
 

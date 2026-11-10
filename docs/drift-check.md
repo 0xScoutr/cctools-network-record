@@ -26,13 +26,17 @@ Each module of the deployment's copy maps to one or two files here:
 
 | Deployment module | This package |
 |---|---|
-| `scan-record/acs.ts`, `config.ts`, `day-values.ts`, `decimal.ts`, `rounds.ts`, `snapshot.ts`, `collector.ts`, `backfill.ts`, `finalize.ts`, `health.ts`, `scan-budget.ts`, `scan-client.ts`, `round-totals-verified.json` | `src/scan-record/` (same names) |
+| `scan-record/acs.ts`, `config.ts`, `day-values.ts`, `decimal.ts`, `rounds.ts`, `snapshot.ts`, `collector.ts`, `backfill.ts`, `finalize.ts`, `health.ts`, `scan-budget.ts`, `scan-client.ts`, `scan-dial.ts`, `round-totals-verified.json` | `src/scan-record/` (same names) |
 | `scan-record/store.ts` | `src/scan-record/store.ts` (interface) and `src/adapters/supabase-store.ts` |
 | `assets/registry.ts` and the Canton Coin part of the deployment's asset supply job | `src/scan-record/supply.ts` |
 | `open-record/contract.ts`, `datapackage.ts`, `day-file.ts`, `methodology.ts`, `publish.ts`, `render.ts`, `serve.ts` | `src/open-record/` (same names) |
 | `open-record/reader.ts` | `src/adapters/supabase-reader.ts` |
 | the record migration | `sql/schema.sql` |
 | the migration's live check | `sql/check-schema.sql` |
+
+The deployment's `scan-record/scan-read.ts`, the host setting of its other
+Scan readers, is not shared: the record does not use it, so the lock lists it
+under `not_shared`.
 
 The supply row is outside the lock check below: the check hashes files under
 one root and lists only `scan-record/` and `open-record/`, and the
@@ -75,6 +79,7 @@ change still shows in review as a lock change next to the module change.
   "commit": "<package commit the modules were last ported to>",
   "port_manifest_sha256": "<sha256 of port-manifest.json at that commit>",
   "root": "<directory of the record modules in the deployment>",
+  "not_shared": ["scan-record/scan-read.ts"],
   "files": {
     "scan-record/decimal.ts": "<sha256, LF line ends>",
     "...": "..."
@@ -114,7 +119,9 @@ for (const [path, want] of Object.entries(lock.files)) {
 for (const dir of ["scan-record", "open-record"]) {
   for (const name of readdirSync(join(lock.root, dir))) {
     if (name === "__tests__") continue;
-    if (!(`${dir}/${name}` in lock.files)) problems.push(`${dir}/${name}: not in the lock (port it, or list it as not shared)`);
+    if (!(`${dir}/${name}` in lock.files) && !(lock.not_shared ?? []).includes(`${dir}/${name}`)) {
+      problems.push(`${dir}/${name}: not in the lock (port it, or list it under not_shared)`);
+    }
   }
 }
 
