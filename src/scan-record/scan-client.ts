@@ -150,18 +150,20 @@ export function parseScanHosts(raw: string | readonly string[], setting: string)
   // A typo here must fail the run, not read as a host that is down.
   scanForwardPorts();
   for (const base of list) {
+    // An entry is echoed with any port masked: a forward's port is the operator's (scan-dial.ts).
+    const shown = base.replace(/:\d+/g, ":PORT");
     let protocol: string | null = null;
     try {
       protocol = new URL(base).protocol;
     } catch {
       protocol = null;
     }
-    if (protocol !== "https:") throw new Error(`${setting} entry "${base}" is not an https URL`);
+    if (protocol !== "https:") throw new Error(`${setting} entry "${shown}" is not an https URL`);
     const url = new URL(base);
     if (isSvScanHost(url.hostname)) {
       // Without the prefix every path is a plain 404.
-      if (url.pathname !== "/api/scan") throw new Error(`${setting} entry "${base}" must end in /api/scan`);
-      if (url.port !== "") throw new Error(`${setting} entry "${base}" carries a port: a forward's port goes in SCAN_FORWARD_PORTS`);
+      if (url.pathname !== "/api/scan") throw new Error(`${setting} entry "${shown}" must end in /api/scan`);
+      if (url.port !== "") throw new Error(`${setting} entry "${shown}" carries a port: a forward's port goes in SCAN_FORWARD_PORTS`);
     }
   }
   return list;

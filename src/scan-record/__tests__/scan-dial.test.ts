@@ -130,7 +130,7 @@ describe("scanForwardPorts", () => {
 
   it("names a bad entry by its host, never by its port", () => {
     expect(() => scanForwardPorts(`${NAME}=99999`)).toThrow(`SCAN_FORWARD_PORTS has an entry for ${NAME} that is not host=port`);
-    for (const entry of [`${NAME}=99999`, `${NAME}=1024=1025`, "=1024"]) {
+    for (const entry of [`${NAME}=99999`, `${NAME}=1024=1025`, "=1024", `${NAME}:1025`]) {
       let message = "";
       try {
         scanForwardPorts(entry);

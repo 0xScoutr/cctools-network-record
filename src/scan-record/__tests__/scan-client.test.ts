@@ -221,6 +221,16 @@ describe("scanRequest", () => {
       expect(releaseScanSlot).toHaveBeenCalledWith(SV_A);
     });
 
+    it("never echoes a port in the setting's errors", async () => {
+      for (const entry of [`https://${SV_A}:43210/api/scan`, `https://${SV_A}:43210`, `http://${SV_A}:43210/api/scan`, `${SV_A}:43210/api/scan`]) {
+        process.env.SCAN_RECORD_HOSTS = entry;
+        const err = await scanRequest("/v0/dso", { method: "GET", cls: "record" }).catch((e: unknown) => e);
+        expect((err as Error).message, entry).toMatch(/SCAN_RECORD_HOSTS entry/);
+        expect((err as Error).message, entry).not.toContain("43210");
+      }
+      expect(calls).toHaveLength(0);
+    });
+
     it("checks a host list given through the settings the same way", async () => {
       respond(json({}));
       for (const host of [`https://${SV_A}`, `https://${SV_A}:8443/api/scan`]) {
