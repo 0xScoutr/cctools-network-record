@@ -27,7 +27,8 @@
  * failure rules and health latch. The seams: the fetch and User-Agent come
  * from runtime/scan-settings.ts; with no Super Validator listed, the registry
  * base defaults to the first Scan host's instead of a row of the deployment's
- * asset table (registryBaseUrl names another); the health latch key and the
+ * asset table (registryBaseUrl names another, and a Super Validator's named
+ * there is read in its budget too); the health latch key and the
  * cache tag are the package's own (network-record-supply); a reading is
  * stored through SupplyWriter instead of the deployment's asset tables, and a
  * failed read is reported to the health latch and the result, not to a
@@ -57,7 +58,7 @@ import {
   SCAN_BUDGET,
 } from "./scan-budget";
 import { DEFAULT_USER_AGENT, scanRecordHosts } from "./scan-client";
-import { scanDial } from "./scan-dial";
+import { scanDial, scanForwardPorts } from "./scan-dial";
 
 /** Canton Coin's instrument id in Scan's registry. */
 export const CC_INSTRUMENT_ID = "Amulet";
@@ -141,14 +142,18 @@ function resultOf(body: { instruments?: unknown }, status: number | null): Regis
 }
 
 /**
- * Every instrument a registry issues, in one request.
+ * Every instrument a registry issues, in one request. On a Super Validator's
+ * host it is one read in the Super Validators' budget, never retried
+ * (readSvRegistry), whoever asks; `instrumentId` names the instrument whose
+ * reading must be fresh there.
  *
  * Never throws: the failure comes back as data, so the caller can report it
  * against the instrument it was reading.
  */
-export async function fetchRegistryInstruments(registryBaseUrl: string): Promise<RegistryFetchResult> {
+export async function fetchRegistryInstruments(registryBaseUrl: string, instrumentId = CC_INSTRUMENT_ID): Promise<RegistryFetchResult> {
   const url = `${registryBaseUrl.replace(/\/$/, "")}/instruments`;
   const host = hostOf(url);
+  if (isSvScanHost(host)) return readSvRegistry(registryBaseUrl.replace(/\/$/, ""), instrumentId);
   const settings = scanSettings();
   const send = settings.fetch ?? scanDial;
 
@@ -239,17 +244,18 @@ async function readSvRegistry(base: string, instrumentId: string): Promise<Regis
  * The instruments from the first Scan host that serves them with a fresh
  * reading, and which registry that was (null when none did). With no Super
  * Validator in the Scan host list it reads defaultRegistryBaseUrl() as it
- * always did. Never throws, like the read above.
+ * always did. A failed read comes back as data, like the read above; only a
+ * bad setting (the Scan host list, SCAN_FORWARD_PORTS) throws, before any call.
  */
 export async function fetchCcRegistry(instrumentId = CC_INSTRUMENT_ID): Promise<RegistryFetchResult & { registry: string | null }> {
   if (!scanRecordHosts().some((base) => isSvScanHost(hostOf(base)))) {
     const registry = defaultRegistryBaseUrl();
-    return { ...(await fetchRegistryInstruments(registry)), registry };
+    return { ...(await fetchRegistryInstruments(registry, instrumentId)), registry };
   }
   let last: RegistryFetchResult = { ok: false, instruments: [], status: null, error: "no Scan host" };
   for (const base of ccRegistryBases()) {
     const host = hostOf(base);
-    last = isSvScanHost(host) ? await readSvRegistry(base, instrumentId) : await fetchRegistryInstruments(base);
+    last = isSvScanHost(host) ? await readSvRegistry(base, instrumentId) : await fetchRegistryInstruments(base, instrumentId);
     if (last.ok) return { ...last, registry: base };
     console.warn(`[scan-record] ${host} did not serve the CC registry: ${last.error}`);
   }
@@ -299,6 +305,8 @@ export async function runSupplyCollection(deps: {
   instrumentId?: string;
 }): Promise<SupplyCollectionResult> {
   const instrumentId = deps.instrumentId ?? CC_INSTRUMENT_ID;
+  // A typo in the forwards fails the run here, never inside a read where it would look like a registry that is down.
+  scanForwardPorts();
   const outcome = (ok: boolean, detail: string): FeedOutcome => ({ id: "registry:CC", label: "CC registry", ok, detail });
   const done = async (result: SupplyCollectionResult, detail: string): Promise<SupplyCollectionResult> => {
     await checkFeedHealth(SUPPLY_HEALTH, [outcome(result.ok, detail)]);
@@ -306,7 +314,7 @@ export async function runSupplyCollection(deps: {
   };
   const result =
     deps.registryBaseUrl !== undefined
-      ? { ...(await fetchRegistryInstruments(deps.registryBaseUrl)), registry: deps.registryBaseUrl }
+      ? { ...(await fetchRegistryInstruments(deps.registryBaseUrl, instrumentId)), registry: deps.registryBaseUrl }
       : await fetchCcRegistry(instrumentId);
   const registry = result.registry;
   const base = { registry, reading: null, inserted: false, no_supply_reported: false };

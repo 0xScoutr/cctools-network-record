@@ -127,6 +127,36 @@ describe("the Canton Coin registry along the Scan host list", () => {
     });
   });
 
+  describe("a Super Validator's registry named on its own (registryBaseUrl)", () => {
+    const REGISTRY = `https://${SV_A}/registry/metadata/v1`;
+    const writer: SupplyWriter = { recordSupplyReading: async () => true };
+
+    it("is read in the Super Validators' budget: a 429 sends one request, closes them all and is not retried", async () => {
+      setCacheStoreBackend(memoryCacheStore());
+      const stub = vi.fn(async () => new Response("slow", { status: 429, headers: { "retry-after": "8" } }));
+      vi.stubGlobal("fetch", stub);
+      const run = await runSupplyCollection({ writer, registryBaseUrl: REGISTRY });
+      expect(run).toMatchObject({ ok: false, error: "HTTP 429" });
+      expect(stub).toHaveBeenCalledTimes(1);
+      expect(acquireScanSlot).toHaveBeenCalledWith(SV_A, "cron");
+      expect(openScanGate).toHaveBeenCalledWith(SV_A, "8");
+      expect(releaseScanSlot).toHaveBeenCalledWith(SV_A);
+      expect(markScanCall).not.toHaveBeenCalled();
+    });
+
+    it("fails the run on a typo in SCAN_FORWARD_PORTS before any request", async () => {
+      const stub = vi.fn(async () => ok());
+      vi.stubGlobal("fetch", stub);
+      process.env.SCAN_FORWARD_PORTS = `${SV_A}=not-a-port`;
+      try {
+        await expect(runSupplyCollection({ writer, registryBaseUrl: REGISTRY })).rejects.toThrow(/SCAN_FORWARD_PORTS/);
+        expect(stub).not.toHaveBeenCalled();
+      } finally {
+        delete process.env.SCAN_FORWARD_PORTS;
+      }
+    });
+  });
+
   it("stores the reading under the host that served it", async () => {
     setCacheStoreBackend(memoryCacheStore());
     process.env.SCAN_RECORD_HOSTS = LIST;
