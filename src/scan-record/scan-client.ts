@@ -5,6 +5,14 @@
  * carries the host it came from, because every stored value records its
  * source.
  *
+ * A list can go Super Validators first and a public Scan host last: a host
+ * that refuses, fails or times out sends the call on to the next one by
+ * itself, with a log line, and the value then names the host that really
+ * served it, so a fallback shows in the published files and in the source
+ * alarm (health.ts SCAN_SOURCE_HEALTH). On a Super Validator that goes for any
+ * answer but a 200: one whose snapshots lag answers 404 for a day another holds.
+ * On any other host, what it answered about the question itself ends the call.
+ *
  * No inline retries: a 429 or a dropped connection opens the shared gate and
  * the next scheduled run tries again. ACS snapshots are read from
  * /v2/state/acs, and from /v0/state/acs only on a host that does not serve v2
@@ -23,12 +31,16 @@ import type { AcsCreatedEvent } from "./acs";
 import { parseOpenAndIssuing, type ParsedRounds, type ScanTransaction } from "./rounds";
 import {
   acquireScanSlot,
+  closeSvScanHost,
   hostOf,
+  isSvScanHost,
   openScanGate,
+  releaseScanSlot,
   ScanBusyError,
   scanSlotMaxWaitMs,
   type ScanCallClass,
 } from "./scan-budget";
+import { scanDial, scanForwardPorts } from "./scan-dial";
 
 const DEFAULT_HOST = "https://api.cantonnodes.com";
 /** The User-Agent of every Scan call when the settings name none; the registry reader (supply.ts) sends it too. */
@@ -39,6 +51,9 @@ const TIMEOUT_MS = SCAN_TIMEOUT_MS;
 const ACS_PAGE_SIZE = 1000;
 const ACS_MAX_PAGES = 5;
 const MIGRATION_KEY = "scan:migration-id";
+const LAST_SOURCE_KEY = "scan:last-source";
+/** Long enough to read between two runs; an alarm never reads a host this old as current. */
+const LAST_SOURCE_MEMORY_MS = 3_600_000;
 
 /**
  * The ACS endpoints, v2 asked first. v2 pages with an opaque string token and
@@ -122,11 +137,18 @@ export function acsEndpointAbsent(err: unknown): err is ScanHttpError {
   return err.status === 404 && !isScanErrorBody(err.detail);
 }
 
-export function scanRecordHosts(): string[] {
-  const configured = scanSettings().hosts ?? (process.env.SCAN_RECORD_HOSTS ?? "").split(",");
-  const list = configured
+/**
+ * An ordered list of https Scan bases (comma-separated text, or a list),
+ * checked. A Super Validator serves Scan under /api/scan and a public host such
+ * as api.cantonnodes.com at its root, so a Super Validator's entry carries the
+ * prefix.
+ */
+export function parseScanHosts(raw: string | readonly string[], setting: string): string[] {
+  const list = (typeof raw === "string" ? raw.split(",") : [...raw])
     .map((h) => h.trim().replace(/\/$/, ""))
     .filter(Boolean);
+  // A typo here must fail the run, not read as a host that is down.
+  scanForwardPorts();
   for (const base of list) {
     let protocol: string | null = null;
     try {
@@ -134,8 +156,23 @@ export function scanRecordHosts(): string[] {
     } catch {
       protocol = null;
     }
-    if (protocol !== "https:") throw new Error(`SCAN_RECORD_HOSTS entry "${base}" is not an https URL`);
+    if (protocol !== "https:") throw new Error(`${setting} entry "${base}" is not an https URL`);
+    const url = new URL(base);
+    if (isSvScanHost(url.hostname)) {
+      // Without the prefix every path is a plain 404.
+      if (url.pathname !== "/api/scan") throw new Error(`${setting} entry "${base}" must end in /api/scan`);
+      if (url.port !== "") throw new Error(`${setting} entry "${base}" carries a port: a forward's port goes in SCAN_FORWARD_PORTS`);
+    }
   }
+  return list;
+}
+
+export function scanRecordHosts(): string[] {
+  const configured = scanSettings().hosts;
+  const list =
+    configured !== undefined
+      ? parseScanHosts(configured, "Scan host list")
+      : parseScanHosts(process.env.SCAN_RECORD_HOSTS ?? "", "SCAN_RECORD_HOSTS");
   return list.length > 0 ? list : [DEFAULT_HOST];
 }
 
@@ -173,10 +210,83 @@ function basesFor(pinned: string | undefined): string[] {
   return [base];
 }
 
+/**
+ * Whether another host may do better. A Super Validator's 404 is not the network's answer: its snapshots can lag by a day
+ * (one's were 27 hours behind on 2026-11-06) while the next holds what was asked. On any other host a 404 or a 4xx is an
+ * answer, and 501 says the host does not serve the path (acsEndpointAbsent), which is an answer about its endpoints.
+ */
+function isHostFailure(err: unknown, host: string): boolean {
+  if (err instanceof ScanBusyError || err instanceof ScanTimeoutError || err instanceof ScanShapeError) return true;
+  if (!(err instanceof ScanHttpError)) return false;
+  if (isSvScanHost(host)) return true;
+  return err.status === 403 || err.status === 408 || (err.status >= 500 && err.status !== 501);
+}
+
+/** Whether that failure says the host is out for everything, not only for this read. */
+function isHostDown(err: unknown): boolean {
+  return !(err instanceof ScanHttpError) || err.status === 403 || err.status === 408 || err.status >= 500;
+}
+
+function failureWords(err: unknown): string {
+  if (err instanceof ScanHttpError) return `HTTP ${err.status}`;
+  if (err instanceof ScanBusyError) return err.reason === "gate" ? "throttled or unreachable" : err.reason;
+  if (err instanceof ScanTimeoutError) return "timeout";
+  return "not JSON";
+}
+
+/** One call to one host, admitted by the budget. Every failure is thrown; the loop below decides what it means. */
+async function askHost<T>(base: string, host: string, path: string, init: ScanRequestInit): Promise<T> {
+  trackApiUsage("splice-scan", path);
+  const settings = scanSettings();
+  const send = settings.fetch ?? scanDial;
+  let res: Response;
+  try {
+    res = await send(`${base}${path}`, {
+      method: init.method,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": settings.userAgent ?? DEFAULT_USER_AGENT,
+        ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (isTimeout(err)) throw new ScanTimeoutError(host, path);
+    // A rate-limited public host can drop the connection instead of answering
+    // 429, which Node reports as "fetch failed": treated as a 429. On a Super
+    // Validator it says that host, or the forward to it, is down.
+    if (!isSvScanHost(host)) openScanGate(host, "30");
+    throw new ScanBusyError(host, "gate");
+  }
+  if (res.status === 429) {
+    openScanGate(host, res.headers.get("retry-after"));
+    // Release the unread body so the socket goes back to the pool now.
+    await res.body?.cancel().catch(() => undefined);
+    throw new ScanBusyError(host, "gate");
+  }
+  if (!res.ok) {
+    throw new ScanHttpError(host, path, res.status, await res.text().catch(() => ""));
+  }
+  try {
+    return (await res.json()) as T;
+  } catch (err) {
+    if (isTimeout(err)) throw new ScanTimeoutError(host, path);
+    throw new ScanShapeError(host, path, "the body is not JSON");
+  }
+}
+
+/** The host that answered the record's last Scan read, for the source alarm; null when none did lately. */
+export function lastScanSource(): { host: string; at: string } | null {
+  return sharedGet<{ host: string; at: string }>(LAST_SOURCE_KEY);
+}
+
 export async function scanRequest<T>(path: string, init: ScanRequestInit): Promise<{ host: string; body: T }> {
+  const bases = basesFor(init.host);
   let lastError: unknown = null;
-  for (const base of basesFor(init.host)) {
-    const host = hostOf(base);
+  for (let i = 0; i < bases.length; i++) {
+    const host = hostOf(bases[i]);
+    const next = bases[i + 1] === undefined ? null : hostOf(bases[i + 1]);
     if (init.deadline !== undefined && Date.now() + scanCallWorstCaseMs(init.cls) > init.deadline) {
       throw new ScanBusyError(host, "queue");
     }
@@ -184,49 +294,22 @@ export async function scanRequest<T>(path: string, init: ScanRequestInit): Promi
       await acquireScanSlot(host, init.cls);
     } catch (err) {
       lastError = err;
+      if (next !== null) console.warn(`[scan-record] ${host} did not serve ${path} (${failureWords(err)}); asking ${next}`);
       continue;
     }
-    trackApiUsage("splice-scan", path);
-    let res: Response;
-    const settings = scanSettings();
-    const send = settings.fetch ?? fetch;
     try {
-      res = await send(`${base}${path}`, {
-        method: init.method,
-        headers: {
-          Accept: "application/json",
-          "User-Agent": settings.userAgent ?? DEFAULT_USER_AGENT,
-          ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
-        },
-        body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      const body = await askHost<T>(bases[i], host, path, init);
+      if (bases.length > 1 || isSvScanHost(host)) sharedSet(LAST_SOURCE_KEY, { host, at: new Date().toISOString() }, LAST_SOURCE_MEMORY_MS);
+      return { host, body };
     } catch (err) {
-      if (isTimeout(err)) throw new ScanTimeoutError(host, path);
-      // A rate-limited host can drop the connection instead of answering
-      // 429, which Node reports as "fetch failed": treated as a 429.
-      openScanGate(host, "30");
-      lastError = new ScanBusyError(host, "gate");
-      continue;
+      if (!isHostFailure(err, host)) throw err;
+      // A 429 also closed every other Super Validator (openScanGate); any other failure closes this one alone.
+      if (isSvScanHost(host) && isHostDown(err)) closeSvScanHost(host);
+      lastError = err;
+      if (next !== null) console.warn(`[scan-record] ${host} did not serve ${path} (${failureWords(err)}); asking ${next}`);
+    } finally {
+      releaseScanSlot(host);
     }
-    if (res.status === 429) {
-      openScanGate(host, res.headers.get("retry-after"));
-      // Release the unread body so the socket goes back to the pool now.
-      await res.body?.cancel().catch(() => undefined);
-      lastError = new ScanBusyError(host, "gate");
-      continue;
-    }
-    if (!res.ok) {
-      throw new ScanHttpError(host, path, res.status, await res.text().catch(() => ""));
-    }
-    let body: unknown;
-    try {
-      body = await res.json();
-    } catch (err) {
-      if (isTimeout(err)) throw new ScanTimeoutError(host, path);
-      throw new ScanShapeError(host, path, "the body is not JSON");
-    }
-    return { host, body: body as T };
   }
   throw lastError instanceof Error ? lastError : new Error(`no Scan host answered ${path}`);
 }

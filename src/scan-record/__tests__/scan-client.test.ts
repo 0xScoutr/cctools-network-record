@@ -4,10 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // and reads them at call time.
 const acquireScanSlot = vi.fn(async (_host: string, _cls: string) => {});
 const openScanGate = vi.fn((_host: string, _retryAfter: string | null) => 0);
+const closeSvScanHost = vi.fn((_host: string) => {});
+const releaseScanSlot = vi.fn((_host: string) => {});
 vi.mock("../scan-budget", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../scan-budget")>()),
   acquireScanSlot: (host: string, cls: string) => acquireScanSlot(host, cls),
   openScanGate: (host: string, retryAfter: string | null) => openScanGate(host, retryAfter),
+  closeSvScanHost: (host: string) => closeSvScanHost(host),
+  releaseScanSlot: (host: string) => releaseScanSlot(host),
 }));
 vi.mock("../../runtime/usage", () => ({ trackApiUsage: vi.fn() }));
 const shared = new Map<string, unknown>();
@@ -21,6 +25,7 @@ import {
   ScanHttpError,
   ScanShapeError,
   ScanTimeoutError,
+  lastScanSource,
   liveScanApi,
   scanCallWorstCaseMs,
   scanRequest,
@@ -57,6 +62,8 @@ beforeEach(() => {
   shared.clear();
   acquireScanSlot.mockClear();
   openScanGate.mockClear();
+  closeSvScanHost.mockClear();
+  releaseScanSlot.mockClear();
   delete process.env.SCAN_RECORD_HOSTS;
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -142,16 +149,194 @@ describe("scanRequest", () => {
     expect(calls.map((c) => c.url)).toEqual(["https://scan.example.org/v0/dso", "https://api.cantonnodes.com/v0/dso"]);
   });
 
-  it("stops at an HTTP error without trying the next host or opening the gate", async () => {
+  it("goes on to the next host when the first refuses or fails, without opening the 429 gate", async () => {
+    for (const status of [403, 500, 502, 503, 504]) {
+      calls.length = 0;
+      process.env.SCAN_RECORD_HOSTS = TWO_HOSTS;
+      respond(new Response("no", { status }), json({ ok: 1 }));
+      const r = await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(r.host).toBe("api.cantonnodes.com");
+      expect(calls).toHaveLength(2);
+    }
+    expect(openScanGate).not.toHaveBeenCalled();
+  });
+
+  it("goes on to the next host after a timeout, which opens no gate", async () => {
     process.env.SCAN_RECORD_HOSTS = TWO_HOSTS;
-    respond(new Response("unavailable", { status: 503 }), json({ ok: 1 }));
-    await expect(scanRequest("/v0/dso", { method: "GET", cls: "record" })).rejects.toMatchObject({
+    respond(new DOMException("The operation was aborted due to timeout", "TimeoutError"), json({ ok: 1 }));
+    const r = await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+    expect(r.host).toBe("api.cantonnodes.com");
+    expect(openScanGate).not.toHaveBeenCalled();
+  });
+
+  it("goes on to the next host when a 200 is not JSON (a maintenance page)", async () => {
+    process.env.SCAN_RECORD_HOSTS = TWO_HOSTS;
+    respond(new Response("<html>maintenance</html>", { status: 200 }), json({ ok: 1 }));
+    const r = await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+    expect(r.host).toBe("api.cantonnodes.com");
+  });
+
+  it("stops at a real answer: a 404 from the first host is not a failed host", async () => {
+    process.env.SCAN_RECORD_HOSTS = TWO_HOSTS;
+    respond(new Response('{"error":"Failed to find ACS snapshot"}', { status: 404 }), json({ ok: 1 }));
+    await expect(scanRequest("/v2/state/acs", { method: "POST", body: {}, cls: "record" })).rejects.toMatchObject({
       name: "ScanHttpError",
-      status: 503,
+      status: 404,
       host: "scan.example.org",
     });
     expect(calls).toHaveLength(1);
-    expect(openScanGate).not.toHaveBeenCalled();
+  });
+
+  it("says in the log when it goes on to another host", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    process.env.SCAN_RECORD_HOSTS = TWO_HOSTS;
+    respond(new Response("no", { status: 403 }), json({ ok: 1 }));
+    await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+    expect(warn.mock.calls.flat().join(" ")).toContain("scan.example.org did not serve /v0/dso (HTTP 403); asking api.cantonnodes.com");
+    warn.mockRestore();
+  });
+
+  it("reports the last host's failure when every host failed", async () => {
+    process.env.SCAN_RECORD_HOSTS = TWO_HOSTS;
+    respond(new Response("no", { status: 403 }), new Response("down", { status: 503 }));
+    await expect(scanRequest("/v0/dso", { method: "GET", cls: "record" })).rejects.toMatchObject({
+      name: "ScanHttpError",
+      status: 503,
+      host: "api.cantonnodes.com",
+    });
+  });
+
+  describe("on Super Validator hosts", () => {
+    const SV_A = "scan.sv-8.global.canton.network.example.invalid";
+    const SV_B = "scan.sv-9.global.canton.network.example.invalid";
+    const SV_LIST = `https://${SV_A}/api/scan, https://${SV_B}/api/scan, https://mirror.example.invalid`;
+
+    it("asks under the /api/scan prefix and credits the bare host", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      respond(json({ ok: 1 }));
+      const r = await scanRequest("/v2/updates", { method: "POST", body: {}, cls: "record" });
+      expect(calls[0].url).toBe(`https://${SV_A}/api/scan/v2/updates`);
+      expect(r.host).toBe(SV_A);
+      expect(releaseScanSlot).toHaveBeenCalledWith(SV_A);
+    });
+
+    it("refuses a Super Validator entry without the prefix, or with a port, without dialling", async () => {
+      process.env.SCAN_RECORD_HOSTS = `https://${SV_A}`;
+      respond(json({}));
+      await expect(scanRequest("/v0/dso", { method: "GET", cls: "record" })).rejects.toThrow(/\/api\/scan/);
+      process.env.SCAN_RECORD_HOSTS = `https://${SV_A}:8443/api/scan`;
+      await expect(scanRequest("/v0/dso", { method: "GET", cls: "record" })).rejects.toThrow(/SCAN_FORWARD_PORTS/);
+      expect(calls).toHaveLength(0);
+    });
+
+    it("refuses a typo in SCAN_FORWARD_PORTS before dialling, instead of reading it as a host that is down", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      process.env.SCAN_FORWARD_PORTS = `${SV_A}=not-a-port`;
+      try {
+        respond(json({}));
+        await expect(scanRequest("/v0/dso", { method: "GET", cls: "record" })).rejects.toThrow(/SCAN_FORWARD_PORTS/);
+        expect(calls).toHaveLength(0);
+      } finally {
+        delete process.env.SCAN_FORWARD_PORTS;
+      }
+    });
+
+    it("closes only the failed host on a refusal, a dropped connection or a timeout, and tries the next Super Validator", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      respond(new Response("no", { status: 403 }), json({ ok: 1 }));
+      const r = await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(r.host).toBe(SV_B);
+      expect(closeSvScanHost).toHaveBeenCalledWith(SV_A);
+
+      closeSvScanHost.mockClear();
+      calls.length = 0;
+      respond(new TypeError("fetch failed"), json({ ok: 1 }));
+      expect((await scanRequest("/v0/dso", { method: "GET", cls: "record" })).host).toBe(SV_B);
+      expect(closeSvScanHost).toHaveBeenCalledWith(SV_A);
+
+      closeSvScanHost.mockClear();
+      calls.length = 0;
+      respond(new DOMException("timed out", "TimeoutError"), json({ ok: 1 }));
+      expect((await scanRequest("/v0/dso", { method: "GET", cls: "record" })).host).toBe(SV_B);
+      expect(closeSvScanHost).toHaveBeenCalledWith(SV_A);
+      expect(openScanGate).not.toHaveBeenCalled();
+    });
+
+    it("stops dialling Super Validators at the first 429, and goes to the public host", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      // What the real budget does once the gate is open: every Super Validator refuses.
+      acquireScanSlot.mockImplementationOnce(async () => {}).mockImplementationOnce(async (host: string) => {
+        throw new ScanBusyError(host, "gate");
+      });
+      respond(json({}, 429, { "retry-after": "9" }), json({ ok: 1 }));
+      const r = await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(openScanGate).toHaveBeenCalledWith(SV_A, "9");
+      expect(calls.map((c) => c.url)).toEqual([`https://${SV_A}/api/scan/v0/dso`, "https://mirror.example.invalid/v0/dso"]);
+      expect(r.host).toBe("mirror.example.invalid");
+    });
+
+    it.each([400, 404, 411])("goes on after an HTTP %i from a Super Validator: it may not hold what was asked, and another may", async (status) => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      respond(new Response('{"error":"no"}', { status }), json({ ok: 1 }));
+      const r = await scanRequest("/v2/state/acs", { method: "POST", body: {}, cls: "record" });
+      expect(r.host).toBe(SV_B);
+      // It answered, so it stays in the rotation for everything else.
+      expect(closeSvScanHost).not.toHaveBeenCalled();
+    });
+
+    it("reads a day's snapshot from the next host when the first has only a stale one, and stays there for the rest of the read", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      const noSnapshot = () => new Response(`{"error":"Failed to find ACS snapshot for migration id 4 at ${AT}"}`, { status: 404 });
+      respond(noSnapshot(), v2Page(["a"], "t1"), v2Page(["b"]));
+      const r = await liveScanApi("record").acsSnapshot(4, AT, FEATURED);
+      expect(r.host).toBe(SV_B);
+      expect(r.events.map((e) => e.contract_id)).toEqual(["a", "b"]);
+      expect(calls.map((c) => new URL(c.url).hostname)).toEqual([SV_A, SV_B, SV_B]);
+    });
+
+    it("reports the last host's answer when every host answered 404", async () => {
+      process.env.SCAN_RECORD_HOSTS = `https://${SV_A}/api/scan, https://${SV_B}/api/scan`;
+      respond(new Response('{"error":"no"}', { status: 404 }), new Response('{"error":"no"}', { status: 404 }));
+      await expect(scanRequest("/v2/state/acs", { method: "POST", body: {}, cls: "record" })).rejects.toMatchObject({ status: 404, host: SV_B });
+    });
+
+    it("frees the Super Validators' one place after every answer, a failure included", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      respond(new Response("no", { status: 503 }), new TypeError("fetch failed"), json({ ok: 1 }));
+      await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(releaseScanSlot.mock.calls.map((c) => c[0])).toEqual([SV_A, SV_B, "mirror.example.invalid"]);
+    });
+
+    it("does not free a place it never got", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      acquireScanSlot.mockImplementationOnce(async (host: string) => {
+        throw new ScanBusyError(host, "queue");
+      });
+      respond(json({ ok: 1 }));
+      await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(releaseScanSlot.mock.calls.map((c) => c[0])).toEqual([SV_B]);
+    });
+
+    it("keeps a pinned read on its host, failure or not: a page token is a position in that Scan", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      respond(new Response("down", { status: 503 }), json({ ok: 1 }));
+      await expect(scanRequest("/v0/dso", { method: "GET", cls: "record", host: SV_A })).rejects.toMatchObject({ status: 503 });
+      expect(calls).toHaveLength(1);
+    });
+
+    it("remembers nothing when the list names no Super Validator: with no setting nothing moves", async () => {
+      delete process.env.SCAN_RECORD_HOSTS;
+      respond(json({ ok: 1 }));
+      await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(lastScanSource()).toBeNull();
+    });
+
+    it("remembers which host served last, for the source alarm", async () => {
+      process.env.SCAN_RECORD_HOSTS = SV_LIST;
+      respond(new Response("no", { status: 403 }), json({ ok: 1 }));
+      await scanRequest("/v0/dso", { method: "GET", cls: "record" });
+      expect(lastScanSource()?.host).toBe(SV_B);
+    });
   });
 
   it("asks only the pinned host and reports busy instead of falling back", async () => {
@@ -344,6 +529,6 @@ describe("liveScanApi", () => {
   it.each([null, "", "4", -1, 4.5])("refuses migration_id %j instead of reading it as a number", async (value) => {
     respond(json({ migration_id: value }));
     await expect(liveScanApi("record").migrationId()).rejects.toBeInstanceOf(ScanShapeError);
-    expect(shared.size).toBe(0);
+    expect(shared.has("scan:migration-id")).toBe(false);
   });
 });

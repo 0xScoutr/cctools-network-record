@@ -1,7 +1,9 @@
 /**
  * Small key-value state shared by every caller of one Scan host: the 429
- * gate, the call queue, the cached migration id, the ACS endpoint a host was
- * switched to and the job locks.
+ * gate, the call queue, the Super Validators' one place in flight and their
+ * 429 count, a host marked down, the host that served the last read, the
+ * cached migration id, the ACS endpoint a host was switched to and the job
+ * locks.
  *
  * The functions keep one contract whatever backend holds the state. A read
  * that fails answers "nothing stored" (sharedGet) or `ok: false`
@@ -157,6 +159,28 @@ export function sharedClaim(key: string, ttlMs: number): boolean {
   } catch (err) {
     warn("claim", err);
     return false;
+  }
+}
+
+/**
+ * Add 1 to the counter under `key` and return the new count, atomically. A
+ * missing or expired counter starts again at 1 and lives `ttlMs`; a live one
+ * keeps its expiry. Infinity when the state fails, so a caller that backs off
+ * by the count takes its longest step.
+ */
+export function sharedIncrement(key: string, ttlMs: number): number {
+  try {
+    return backend.transaction(() => {
+      const now = Date.now();
+      const row = backend.get(key);
+      const held = row && row.expiresAt >= now ? Number(JSON.parse(row.value)) : NaN;
+      const next = Number.isFinite(held) ? held + 1 : 1;
+      backend.set(key, { value: JSON.stringify(next), expiresAt: Number.isFinite(held) && row ? row.expiresAt : now + ttlMs });
+      return next;
+    });
+  } catch (err) {
+    warn("increment", err);
+    return Infinity;
   }
 }
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 process.env.SCAN_RECORD_SPACING_MS = "200";
 process.env.SCAN_RECORD_MAX_WAIT_MS = "300";
@@ -58,6 +58,32 @@ describe("Scan call budget", () => {
     await expect(
       b.acquireScanSlot("h4", "backfill", Date.parse("2026-10-12T12:00:00Z")),
     ).rejects.toMatchObject({ reason: "window" });
+  });
+
+  it("judges a caller's own window, across midnight too, and keeps 02:00 to 06:00 for every caller that passes none", () => {
+    const at = (hhmm: string) => Date.parse(`2026-10-12T${hhmm}:00Z`);
+    const wide = { startHour: 22, endHour: 10 };
+    expect(["21:59", "22:00", "23:59", "00:00", "05:00", "09:59", "10:00", "12:00"].map((t) => b.inBackfillWindow(at(t), wide))).toEqual([
+      false, true, true, true, true, true, false, false,
+    ]);
+    expect(["01:59", "02:00", "05:59", "06:00", "23:00"].map((t) => b.inBackfillWindow(at(t)))).toEqual([false, true, true, false, false]);
+    expect(b.inBackfillWindow(at("03:00"), { startHour: 5, endHour: 5 })).toBe(false);
+  });
+
+  it("admits a backfill at 23:00 UTC only for a caller that passes a window holding it", async () => {
+    const now = Date.parse("2026-10-12T23:00:00Z");
+    await expect(b.acquireScanSlot("h4w", "backfill", now)).rejects.toMatchObject({ reason: "window" });
+    await b.acquireScanSlot("h4w", "backfill", now, { startHour: 22, endHour: 10 });
+    // The window is the backfill's alone: a record call ignores it.
+    await expect(b.acquireScanSlot("h4x", "record", Date.parse("2026-10-12T12:00:00Z"), { startHour: 2, endHour: 3 })).resolves.toBeUndefined();
+  });
+
+  it("judges a caller's own window again after the queue wait: refused past its end, admitted across midnight", async () => {
+    const wide = { startHour: 22, endHour: 10 };
+    await b.acquireScanSlot("h12w", "record");
+    await expect(b.acquireScanSlot("h12w", "backfill", Date.parse("2026-10-12T09:59:59.990Z"), wide)).rejects.toMatchObject({ reason: "window" });
+    await b.acquireScanSlot("h13w", "record");
+    await expect(b.acquireScanSlot("h13w", "backfill", Date.parse("2026-10-12T23:59:59.990Z"), wide)).resolves.toBeUndefined();
   });
 
   it("refuses a queued backfill that would dial after 06:00 UTC", async () => {
@@ -123,6 +149,156 @@ describe("Scan call budget", () => {
     expect(b.scanSlotMaxWaitMs("backfill")).toBe(600);
     expect(b.scanSlotMaxWaitMs("cron")).toBe(0);
     expect(b.scanSlotMaxWaitMs("user")).toBe(0);
+  });
+});
+
+describe("Super Validator Scans: one budget for all of them", () => {
+  const SV_A = "scan.sv-1.global.canton.network.example.invalid";
+  const SV_B = "scan.sv-2.global.canton.network.example.invalid";
+
+  it("names the host without its port, so a local forward never reaches source_host", () => {
+    expect(b.hostOf(`https://${SV_A}:8443/api/scan`)).toBe(SV_A);
+    expect(b.hostOf("https://api.cantonnodes.com/v0/dso")).toBe("api.cantonnodes.com");
+  });
+
+  it("recognises the network's own list of Scans, and nothing else", () => {
+    const list = [
+      "scan.sv-2.global.canton.network.digitalasset.com",
+      "scan.sv.global.canton.network.sv-nodeops.com",
+      "scan.sv-1.global.canton.network.lcv.mpch.io",
+      "scan.sv-1.global.canton.network.c7.digital",
+      "scan.sv-1.global.canton.network.digitalasset.com",
+      "scan.sv-1.global.canton.network.proofgroup.xyz",
+      "scan.sv-1.global.canton.network.sync.global",
+      "scan.sv-1.global.canton.network.tradeweb.com",
+      "scan.sv-1.global.canton.network.mpch.io",
+      "scan.sv-1.global.canton.network.fivenorth.io",
+      "scan.sv-2.global.canton.network.cumberland.io",
+      "scan.sv-1.global.canton.network.cumberland.io",
+      "scan.sv-1.global.canton.network.orb1lp.mpch.io",
+    ];
+    expect(list.filter(b.isSvScanHost)).toEqual(list);
+    expect(b.isSvScanHost("api.cantonnodes.com")).toBe(false);
+    expect(b.isSvScanHost("scan.example.org")).toBe(false);
+  });
+
+  describe("from a clean slate", () => {
+    let fresh: typeof import("../scan-budget");
+
+    beforeEach(async () => {
+      const cache = await import("../../runtime/shared-cache");
+      fresh = b;
+      for (const key of ["scan:gate:sv-egress", "scan:next-slot:sv-egress", "scan:sv-egress:in-flight", "scan:sv-egress:strikes", `scan:host-down:${SV_A}`, `scan:host-down:${SV_B}`]) {
+        cache.sharedDelete(key);
+      }
+      process.env.SCAN_RECORD_MAX_WAIT_MS = "300";
+    });
+
+    afterEach(() => {
+      process.env.SCAN_RECORD_MAX_WAIT_MS = "300";
+      delete process.env.SCAN_RECORD_SV_SPACING_MS;
+    });
+
+    it("holds every class to one request at a time, across hosts, until the call is released", async () => {
+      await fresh.acquireScanSlot(SV_A, "cron");
+      await expect(fresh.acquireScanSlot(SV_B, "record")).rejects.toMatchObject({ name: "ScanBusyError", reason: "queue" });
+      await expect(fresh.acquireScanSlot(SV_B, "cron")).rejects.toMatchObject({ name: "ScanBusyError", reason: "queue" });
+      fresh.releaseScanSlot(SV_A);
+    });
+
+    it("keeps the hard floor between two starts on the Super Validators, whatever the settings say", async () => {
+      process.env.SCAN_RECORD_SV_SPACING_MS = "0";
+      process.env.SCAN_RECORD_MAX_WAIT_MS = "5000";
+      expect(fresh.svScanSpacingMs()).toBe(2_000);
+      await fresh.acquireScanSlot(SV_A, "record");
+      fresh.releaseScanSlot(SV_A);
+      const t0 = Date.now();
+      await fresh.acquireScanSlot(SV_B, "record");
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(1_900);
+      fresh.releaseScanSlot(SV_B);
+    });
+
+    it("lets a setting raise the spacing", () => {
+      process.env.SCAN_RECORD_SV_SPACING_MS = "5000";
+      expect(fresh.svScanSpacingMs()).toBe(5_000);
+    });
+
+    it("closes every Super Validator Scan at the first 429 from one, for every class, and leaves a public host alone", async () => {
+      fresh.openScanGate(SV_A, "60");
+      for (const cls of ["record", "cron", "user"] as const) {
+        await expect(fresh.acquireScanSlot(SV_B, cls)).rejects.toMatchObject({ name: "ScanBusyError", reason: "gate" });
+      }
+      expect(fresh.scanGateUntil("api.cantonnodes.com")).toBeNull();
+      await fresh.acquireScanSlot("api.cantonnodes.com", "cron");
+    });
+
+    it("frees the one place when a queued call is refused after taking it", async () => {
+      process.env.SCAN_RECORD_MAX_WAIT_MS = "5000";
+      await fresh.acquireScanSlot(SV_A, "record");
+      fresh.releaseScanSlot(SV_A);
+      // Waits about 2 s for its start with the place held, and the gate opens meanwhile.
+      const queued = fresh.acquireScanSlot(SV_B, "record");
+      setTimeout(() => fresh.openScanGate(SV_A, "5"), 100);
+      await expect(queued).rejects.toMatchObject({ reason: "gate" });
+      process.env.SCAN_RECORD_MAX_WAIT_MS = "300";
+      await expect(fresh.acquireScanSlot(SV_B, "record")).rejects.toMatchObject({ reason: "gate" });
+      // Not "queue": nothing holds the place.
+    });
+
+    it("never makes an interactive call wait: a held place or a start not yet due refuses at once", async () => {
+      process.env.SCAN_RECORD_MAX_WAIT_MS = "5000";
+      await fresh.acquireScanSlot(SV_A, "cron");
+      let t0 = Date.now();
+      await expect(fresh.acquireScanSlot(SV_B, "user")).rejects.toMatchObject({ name: "ScanBusyError", reason: "queue" });
+      expect(Date.now() - t0).toBeLessThan(100);
+      fresh.releaseScanSlot(SV_A);
+      // The place is free now, and the next start is about 2 s away.
+      t0 = Date.now();
+      await expect(fresh.acquireScanSlot(SV_B, "user")).rejects.toMatchObject({ name: "ScanBusyError", reason: "queue" });
+      expect(Date.now() - t0).toBeLessThan(100);
+      // That refusal gave the one place back: a cron caller can still take it.
+      await fresh.acquireScanSlot(SV_B, "cron");
+      fresh.releaseScanSlot(SV_B);
+    });
+
+    it("holds a 429 for hours, whatever Retry-After says, and longer each time, because the allowlisted IP's access is a privilege", () => {
+      const now = Date.now();
+      const HOUR = 3_600_000;
+      // A Retry-After of 2 s, and none: the first closes for an hour either way.
+      expect(fresh.openScanGate(SV_A, "2", now)).toBe(now + HOUR);
+      const later = now + 2 * HOUR;
+      expect(fresh.openScanGate(SV_B, null, later)).toBe(later + 6 * HOUR);
+      const third = later + 7 * HOUR;
+      expect(fresh.openScanGate(SV_A, "30", third)).toBe(third + 24 * HOUR);
+      const fourth = third + 25 * HOUR;
+      expect(fresh.openScanGate(SV_A, "30", fourth)).toBe(fourth + 24 * HOUR);
+    });
+
+    it("believes a Retry-After longer than its own backoff", () => {
+      const now = Date.now();
+      expect(fresh.openScanGate(SV_A, "10800", now)).toBe(now + 3 * 3_600_000);
+    });
+
+    it("leaves a public host's gate as it was: seconds, not hours", () => {
+      const now = Date.now();
+      expect(fresh.openScanGate("api.cantonnodes.com", "2", now)).toBe(now + 5_000);
+    });
+
+    it("closes only the host that failed some other way", async () => {
+      fresh.closeSvScanHost(SV_A);
+      await expect(fresh.acquireScanSlot(SV_A, "record")).rejects.toMatchObject({ name: "ScanBusyError", reason: "gate" });
+      await fresh.acquireScanSlot(SV_B, "record");
+      fresh.releaseScanSlot(SV_B);
+    });
+
+    it("leaves any other host's budget exactly as it was", async () => {
+      await fresh.acquireScanSlot("scan.example.org", "cron");
+      fresh.releaseScanSlot("scan.example.org");
+      await fresh.acquireScanSlot(SV_A, "cron");
+      fresh.releaseScanSlot("scan.example.org");
+      await expect(fresh.acquireScanSlot(SV_B, "cron")).rejects.toMatchObject({ reason: "queue" });
+      fresh.releaseScanSlot(SV_A);
+    });
   });
 });
 

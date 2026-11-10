@@ -4,9 +4,14 @@
  *   hosts      falls back to SCAN_RECORD_HOSTS (ordered, comma-separated
  *              https URLs), then to the default public host in scan-client.ts;
  *   userAgent  falls back to the package's own;
- *   fetch      falls back to the global fetch, looked up at call time.
- * The verify CLI sets two of them: its hosts and a paced fetch (offline, a
- * fetch that replays a recorded tape); the User-Agent stays the package's own.
+ *   fetch      falls back to scanDial (scan-record/scan-dial.ts): the global
+ *              fetch, looked up at call time, or the host's forward when
+ *              SCAN_FORWARD_PORTS names it. A fetch set here replaces both, so
+ *              it dials through scanDial itself when it should reach a
+ *              forwarded host.
+ * The verify CLI sets two of them: its hosts and a paced fetch over scanDial
+ * (offline, a fetch that replays a recorded tape); the User-Agent stays the
+ * package's own.
  */
 
 export interface ScanSettings {
