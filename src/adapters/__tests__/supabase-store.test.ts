@@ -71,6 +71,22 @@ describe("supabaseRecordStore", () => {
     expect(calls).toContainEqual({ table: "asset_supply_snapshots", op: "eq", args: ["supply_as_of", "2026-09-25T00:00:00Z"] });
   });
 
+  it("credits a supply reading to the host that served it, and an older reading with none to api.cantonnodes.com", async () => {
+    const { admin } = fakeAdmin({
+      assets: { data: { id: "cc" }, error: null },
+      asset_supply_snapshots: { data: { total_supply: "1.5", source_host: "scan.sv-1.global.canton.network.example.invalid" }, error: null },
+    });
+    expect(await supabaseRecordStore(admin).getSupplyAt("2026-11-08T00:00:00Z")).toEqual({
+      value: "1.5",
+      source_host: "scan.sv-1.global.canton.network.example.invalid",
+    });
+    const older = fakeAdmin({
+      assets: { data: { id: "cc" }, error: null },
+      asset_supply_snapshots: { data: { total_supply: "1.5", source_host: null }, error: null },
+    });
+    expect(await supabaseRecordStore(older.admin).getSupplyAt("2026-09-25T00:00:00Z")).toEqual({ value: "1.5", source_host: "api.cantonnodes.com" });
+  });
+
   it("changes a final value only through the RPC, passing the source host, as_of and method a backfill needs", async () => {
     const { admin, calls } = fakeAdmin({});
     const store = supabaseRecordStore(admin);

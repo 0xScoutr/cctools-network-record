@@ -42,12 +42,15 @@ const VALUE_SELECT =
 const GAP_SELECT = "date, series, reason_code, reason, status, detected_at, resolved_at, evidence_url";
 const MAX_ROWS = 1_000;
 
+/** How the CC row of `assets` is found, and the host of every reading from before a reading named its own. */
 const CC_REGISTRY_HOST = "api.cantonnodes.com";
 
 /**
  * The operator's own supply tables, outside sql/schema.sql: the asset row of
  * CC's Scan registry, and the readings stored for it, one per totalSupplyAsOf
- * instant, tagged with the source they came from.
+ * instant, tagged with the source they came from. A reading served by a Super
+ * Validator names that host in its raw answer (raw.source_host); one with no
+ * host there was read from CC_REGISTRY_HOST.
  */
 const OPERATOR_SUPPLY = { assets: "assets", readings: "asset_supply_snapshots", source: "scan_registry" } as const;
 
@@ -231,11 +234,11 @@ export function supabaseRecordStore(admin: Admin): RecordStore {
       }
       if (!ccAssetId) return null;
       const { data, error } = await admin
-        .from(OPERATOR_SUPPLY.readings).select("total_supply::text")
+        .from(OPERATOR_SUPPLY.readings).select("total_supply::text, source_host:raw->>source_host")
         .eq("asset_id", ccAssetId).eq("source", OPERATOR_SUPPLY.source).eq("supply_as_of", instantIso).maybeSingle();
       if (error) throw fail("read supply", error);
-      const row = data as { total_supply: string } | null;
-      return row ? { value: row.total_supply, source_host: CC_REGISTRY_HOST } : null;
+      const row = data as { total_supply: string; source_host?: string | null } | null;
+      return row ? { value: row.total_supply, source_host: row.source_host ?? CC_REGISTRY_HOST } : null;
     },
 
     markDirty: (atIso) =>

@@ -11,17 +11,27 @@
  * deployment runs this every 15 minutes. A past day's supply cannot be read
  * again.
  *
+ * Which registry is read: with no Super Validator in the Scan host list, the
+ * first Scan host's /registry/metadata/v1 (api.cantonnodes.com by default).
+ * With one, the registry of every host in the list, in order, at the root of
+ * its host (a Super Validator serves Scan under /api/scan and the registry at
+ * the root), until one serves a fresh reading (fetchCcRegistry); each reading
+ * names the host that served it. A Super Validator is read in its one place
+ * in the budget (scan-budget.ts), with no retry, and a 429 from it closes them
+ * all; a reading it serves that is older than svSnapshotMaxAgeMs is passed
+ * over for the next host, because the D+1 00:00:00Z reading a day needs would
+ * never arrive from it.
+ *
  * Ported from the CCTools deployment's registry reader and the Canton Coin
  * part of its supply job, with the same requests, retries, budget marks,
  * failure rules and health latch. The seams: the fetch and User-Agent come
- * from runtime/scan-settings.ts; the registry base defaults to the first Scan
- * host's /registry/metadata/v1 instead of a row of the deployment's asset
- * table (that default fits api.cantonnodes.com; a Scan whose API sits under
- * /api/scan, as a Super Validator's own does, serves the registry elsewhere,
- * so set registryBaseUrl there); the health latch key and the cache tag are
- * the package's own (network-record-supply); a reading is stored through
- * SupplyWriter instead of the deployment's asset tables, and a failed read is reported to the health latch and the
- * result, not to a per-asset failure counter.
+ * from runtime/scan-settings.ts; with no Super Validator listed, the registry
+ * base defaults to the first Scan host's instead of a row of the deployment's
+ * asset table (registryBaseUrl names another); the health latch key and the
+ * cache tag are the package's own (network-record-supply); a reading is
+ * stored through SupplyWriter instead of the deployment's asset tables, and a
+ * failed read is reported to the health latch and the result, not to a
+ * per-asset failure counter.
  *
  * Three things the registry does that this code relies on knowing:
  *   1. Only `/instruments` returning a non-empty list proves a registry is
@@ -36,8 +46,18 @@
 
 import { checkFeedHealth, type FeedHealthConfig, type FeedOutcome } from "../runtime/feed-health";
 import { scanSettings } from "../runtime/scan-settings";
-import { hostOf, markScanCall, openScanGate } from "./scan-budget";
+import {
+  acquireScanSlot,
+  closeSvScanHost,
+  hostOf,
+  isSvScanHost,
+  markScanCall,
+  openScanGate,
+  releaseScanSlot,
+  SCAN_BUDGET,
+} from "./scan-budget";
 import { DEFAULT_USER_AGENT, scanRecordHosts } from "./scan-client";
+import { scanDial } from "./scan-dial";
 
 /** Canton Coin's instrument id in Scan's registry. */
 export const CC_INSTRUMENT_ID = "Amulet";
@@ -101,6 +121,25 @@ function normalise(raw: unknown): RegistryInstrument | null {
   };
 }
 
+function resultOf(body: { instruments?: unknown }, status: number | null): RegistryFetchResult {
+  const list = Array.isArray(body.instruments) ? body.instruments : [];
+  const instruments = list.map(normalise).filter((i): i is RegistryInstrument => i !== null);
+
+  // An empty list is reported as a failure rather than as "this issuer has
+  // no tokens": in practice it means a wrong registry path or a registry
+  // that moved.
+  if (instruments.length === 0) {
+    return {
+      ok: false,
+      instruments: [],
+      status,
+      error: "registry returned no instruments (truncated party id, or the registrar moved)",
+    };
+  }
+
+  return { ok: true, instruments, status, error: null };
+}
+
 /**
  * Every instrument a registry issues, in one request.
  *
@@ -111,7 +150,7 @@ export async function fetchRegistryInstruments(registryBaseUrl: string): Promise
   const url = `${registryBaseUrl.replace(/\/$/, "")}/instruments`;
   const host = hostOf(url);
   const settings = scanSettings();
-  const send = settings.fetch ?? fetch;
+  const send = settings.fetch ?? scanDial;
 
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     let status: number | null = null;
@@ -136,23 +175,7 @@ export async function fetchRegistryInstruments(registryBaseUrl: string): Promise
         return { ok: false, instruments: [], status, error: `HTTP ${status}` };
       }
 
-      const body = (await res.json()) as { instruments?: unknown };
-      const list = Array.isArray(body.instruments) ? body.instruments : [];
-      const instruments = list.map(normalise).filter((i): i is RegistryInstrument => i !== null);
-
-      // An empty list is reported as a failure rather than as "this issuer has
-      // no tokens": in practice it means a wrong registry path or a registry
-      // that moved.
-      if (instruments.length === 0) {
-        return {
-          ok: false,
-          instruments: [],
-          status,
-          error: "registry returned no instruments (truncated party id, or the registrar moved)",
-        };
-      }
-
-      return { ok: true, instruments, status, error: null };
+      return resultOf((await res.json()) as { instruments?: unknown }, status);
     } catch (err) {
       const message = err instanceof Error ? err.message : "unknown";
       if (attempt < RETRY_DELAYS_MS.length) {
@@ -164,6 +187,73 @@ export async function fetchRegistryInstruments(registryBaseUrl: string): Promise
   }
 
   return { ok: false, instruments: [], status: null, error: "exhausted retries" };
+}
+
+/** The registry on each of the Scan hosts, in order. A Super Validator serves it at the root, not under /api/scan. */
+export function ccRegistryBases(): string[] {
+  return scanRecordHosts().map((base) => `${new URL(base).origin}/registry/metadata/v1`);
+}
+
+/** One read on a Super Validator: its one place in the budget, no retry, and a 429 ends the Super Validators' turn. */
+async function readSvRegistry(base: string, instrumentId: string): Promise<RegistryFetchResult> {
+  const host = hostOf(base);
+  const failed = (status: number | null, error: string): RegistryFetchResult => ({ ok: false, instruments: [], status, error });
+  try {
+    await acquireScanSlot(host, "cron");
+  } catch (err) {
+    return failed(null, err instanceof Error ? err.message : "not admitted");
+  }
+  const settings = scanSettings();
+  const send = settings.fetch ?? scanDial;
+  try {
+    const res = await send(`${base}/instruments`, {
+      headers: { Accept: "application/json", "User-Agent": settings.userAgent ?? DEFAULT_USER_AGENT },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (res.status === 429) {
+      openScanGate(host, res.headers?.get?.("retry-after") ?? null);
+      await res.body?.cancel().catch(() => undefined);
+      return failed(429, "HTTP 429");
+    }
+    if (!res.ok) {
+      closeSvScanHost(host);
+      await res.body?.cancel().catch(() => undefined);
+      return failed(res.status, `HTTP ${res.status}`);
+    }
+    const result = resultOf((await res.json()) as { instruments?: unknown }, res.status);
+    // A 200 is not enough. One Scan's reading was 27 hours old on 2026-11-06: taken, the 00:00 UTC reading a day's supply
+    // needs never arrives, and every day goes final without it. The host still serves everything else, so it stays open.
+    const at = result.instruments.find((i) => i.id === instrumentId)?.totalSupplyAsOf;
+    const age = at ? Date.now() - Date.parse(at) : NaN;
+    if (age > SCAN_BUDGET.svSnapshotMaxAgeMs) return failed(res.status, `snapshot ${at} is ${Math.round(age / 3_600_000)} hours old`);
+    return result;
+  } catch (err) {
+    closeSvScanHost(host);
+    return failed(null, err instanceof Error ? err.message : "unknown");
+  } finally {
+    releaseScanSlot(host);
+  }
+}
+
+/**
+ * The instruments from the first Scan host that serves them with a fresh
+ * reading, and which registry that was (null when none did). With no Super
+ * Validator in the Scan host list it reads defaultRegistryBaseUrl() as it
+ * always did. Never throws, like the read above.
+ */
+export async function fetchCcRegistry(instrumentId = CC_INSTRUMENT_ID): Promise<RegistryFetchResult & { registry: string | null }> {
+  if (!scanRecordHosts().some((base) => isSvScanHost(hostOf(base)))) {
+    const registry = defaultRegistryBaseUrl();
+    return { ...(await fetchRegistryInstruments(registry)), registry };
+  }
+  let last: RegistryFetchResult = { ok: false, instruments: [], status: null, error: "no Scan host" };
+  for (const base of ccRegistryBases()) {
+    const host = hostOf(base);
+    last = isSvScanHost(host) ? await readSvRegistry(base, instrumentId) : await fetchRegistryInstruments(base);
+    if (last.ok) return { ...last, registry: base };
+    console.warn(`[scan-record] ${host} did not serve the CC registry: ${last.error}`);
+  }
+  return { ...last, registry: null };
 }
 
 /** One registry reading, as the record stores it. */
@@ -184,7 +274,8 @@ export interface SupplyWriter {
 export interface SupplyCollectionResult {
   /** The run produced a usable outcome: a reading stored (or already stored), or no supply reported. */
   ok: boolean;
-  registry: string;
+  /** The registry that served, or the one asked; null when the hosts were tried in turn and none served. */
+  registry: string | null;
   /** The reading the registry served for the instrument, when it reported one. */
   reading: SupplyReading | null;
   /** The reading was new to the store. */
@@ -202,22 +293,24 @@ export function defaultRegistryBaseUrl(): string {
 /** One run: read the registry, store Canton Coin's reading, and report the outcome to the health latch. */
 export async function runSupplyCollection(deps: {
   writer: SupplyWriter;
-  /** Default defaultRegistryBaseUrl(). */
+  /** Read only this registry. Default: fetchCcRegistry, along the Scan hosts. */
   registryBaseUrl?: string;
   /** Default CC_INSTRUMENT_ID. */
   instrumentId?: string;
 }): Promise<SupplyCollectionResult> {
-  const registry = deps.registryBaseUrl ?? defaultRegistryBaseUrl();
   const instrumentId = deps.instrumentId ?? CC_INSTRUMENT_ID;
   const outcome = (ok: boolean, detail: string): FeedOutcome => ({ id: "registry:CC", label: "CC registry", ok, detail });
   const done = async (result: SupplyCollectionResult, detail: string): Promise<SupplyCollectionResult> => {
     await checkFeedHealth(SUPPLY_HEALTH, [outcome(result.ok, detail)]);
     return result;
   };
+  const result =
+    deps.registryBaseUrl !== undefined
+      ? { ...(await fetchRegistryInstruments(deps.registryBaseUrl)), registry: deps.registryBaseUrl }
+      : await fetchCcRegistry(instrumentId);
+  const registry = result.registry;
   const base = { registry, reading: null, inserted: false, no_supply_reported: false };
-
-  const result = await fetchRegistryInstruments(registry);
-  if (!result.ok) return done({ ...base, ok: false, error: result.error ?? "unknown" }, result.error ?? "unknown");
+  if (!result.ok || registry === null) return done({ ...base, ok: false, error: result.error ?? "unknown" }, result.error ?? "unknown");
 
   const instrument = result.instruments.find((i) => i.id === instrumentId);
   if (!instrument) {
