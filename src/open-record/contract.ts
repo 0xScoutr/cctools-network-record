@@ -26,13 +26,30 @@ export const LICENSE = {
 export const ATTRIBUTION =
   "Source: CCTools daily record of the Canton Network (CC BY 4.0), https://cctools.network/network";
 
+/** How one value's source_host names more than one host (day-values.ts hostsOf). */
+export const SOURCE_HOST_SEPARATOR = ", ";
+
+/** api.cantonnodes.com, the public mirror of a Super Validator's Scan: the one host every value named until the record could read another. */
+export const MIRROR_SOURCE_HOST = "api.cantonnodes.com";
+
 /**
- * What the license covers: CCTools can license only
- * what it derives. The source data comes from a Super Validator's Scan under
- * that host's terms, and api.cantonnodes.com publishes none.
+ * What the license covers: CCTools can license only what it derives. Two
+ * wordings, because a file says what held for what it carries: one that names
+ * only api.cantonnodes.com keeps the words it was published with, so no
+ * published file changes (no sha256, ETag or generation) until a day really
+ * reads a Super Validator, and a past day never does. No host read so far
+ * publishes terms.
  */
 export const LICENSE_SCOPE =
   "CC BY 4.0 covers the daily aggregates CCTools derives and this documentation. They are derived from Scan data served publicly by a Super Validator; the host is named in the sources and on every value, and CCTools licenses only its derived aggregates, not the underlying Scan data.";
+export const LICENSE_SCOPE_ANY_HOST =
+  "CC BY 4.0 covers the daily aggregates CCTools derives and this documentation. They are derived from Canton Scan data; the host that served it is named in the sources and on every value, and CCTools licenses only its derived aggregates, not the underlying Scan data.";
+
+export const namesOnlyMirror = (hosts: readonly string[]): boolean => hosts.every((host) => host === MIRROR_SOURCE_HOST);
+
+export function licenseScopeFor(hosts: readonly string[]): string {
+  return namesOnlyMirror(hosts) ? LICENSE_SCOPE : LICENSE_SCOPE_ANY_HOST;
+}
 
 /** The same words as the site footer: Digital Asset's own two-sentence template. A test pins the text. */
 export const TRADEMARK_NOTICE =

@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ATTRIBUTION, LICENSE_SCOPE, RECORD_FIRST_DATE, addDays, type DayFile } from "../contract";
+import { ATTRIBUTION, LICENSE_SCOPE, LICENSE_SCOPE_ANY_HOST, RECORD_FIRST_DATE, addDays, type DayFile, type SeriesName, type ValueRow } from "../contract";
 import { citationFor, dayNotes, formatDayLong, formatDayShort, renderDayFile } from "../day-file";
 import { MISSING_DAY_REASON, buildModel, type RecordModel } from "../render";
 import { fullDay, gapRow, revisionRow } from "./helpers/rows";
@@ -217,5 +219,56 @@ describe("days/{date}.json", () => {
   it("refuses a date outside the published range", () => {
     expect(() => renderDayFile(model, addDays(D2, 1), "g1")).toThrow(/outside the published range/);
     expect(() => renderDayFile(model, addDays(D0, -1), "g1")).toThrow(/outside the published range/);
+  });
+});
+
+describe("a day file already published", () => {
+  // days/2026-10-25.json as served on 2026-10-27, generation g20261027T004001Z (the offline verify's copy).
+  const raw = readFileSync(join(process.cwd(), "fixtures/verify/2026-10-25/published/days/2026-10-25.json"), "utf-8").replace(/\r\n/g, "\n");
+  const published = JSON.parse(raw) as DayFile;
+  const rowsOf = (hostOf: (series: string) => string | null): ValueRow[] =>
+    Object.entries(published.values).map(([series, v]) => ({
+      date: published.date,
+      series: series as SeriesName,
+      value: v?.value == null ? null : String(v.value),
+      status: v?.status ?? "final",
+      source_host: hostOf(series) ?? v?.source_host ?? null,
+      method: v?.method ?? "scan-1",
+      as_of: v?.as_of ?? null,
+      retrieved_at: "2026-10-27T00:40:01Z",
+      finalized_at: "2026-10-27T00:40:01Z",
+      revision: v?.revision ?? 0,
+      revised_at: v?.revised_at ?? null,
+    })) as ValueRow[];
+  const render = (rows: ValueRow[]) =>
+    renderDayFile(
+      buildModel(
+        [...fullDay("2026-10-24"), ...rows, ...fullDay("2026-10-26")],
+        published.gaps.map((g) => ({ ...g, date: published.date })) as never,
+        [],
+      ),
+      published.date,
+      published.generation_id,
+    );
+
+  it("renders to the same bytes while it names only api.cantonnodes.com: with no setting no published file changes", () => {
+    expect(render(rowsOf(() => null))).toBe(raw);
+  });
+
+  it("keeps the words of a past day read from api.cantonnodes.com after another day reads a Super Validator", () => {
+    const model = buildModel(
+      [...fullDay("2026-10-24"), ...rowsOf(() => null), ...fullDay("2026-10-26").map((r) => ({ ...r, source_host: "scan.sv-2.global.canton.network.digitalasset.com" }))],
+      published.gaps.map((g) => ({ ...g, date: published.date })) as never,
+      [],
+    );
+    expect(renderDayFile(model, published.date, published.generation_id)).toBe(raw);
+    expect((JSON.parse(renderDayFile(model, "2026-10-26", "g2")) as DayFile).license_scope).toBe(LICENSE_SCOPE_ANY_HOST);
+  });
+
+  it("says the words that hold once a day names a Super Validator, also when only one of its values does", () => {
+    const one = JSON.parse(render(rowsOf((series) => (series === "rounds" ? "scan.sv-2.global.canton.network.digitalasset.com" : null)))) as DayFile;
+    expect(one.license_scope).toBe(LICENSE_SCOPE_ANY_HOST);
+    expect(one.license_scope).not.toContain("served publicly");
+    expect(LICENSE_SCOPE).toContain("served publicly");
   });
 });

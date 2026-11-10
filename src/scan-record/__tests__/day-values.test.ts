@@ -48,6 +48,44 @@ const ROUND_SERIES = ["first_round", "last_round", "rounds", ...ISSUANCE_CATEGOR
 
 const valueOf = (r: ReturnType<typeof computeDay>, s: SeriesName) => r.series[s].value;
 
+describe("a value read from more than one host", () => {
+  it("names every host its rounds came from, not just the first row's", () => {
+    const base = inputs();
+    const rows = base.roundsInRange.map((r, i) => (i === 0 ? { ...r, source_host: "scan.sv-1.global.canton.network.example.invalid" } : r));
+    const r = computeDay({ ...base, roundsInRange: rows, startedInDay: rows });
+    expect(r.series.app_rewards_cc.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+    expect(r.series.issuance_cc.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+  });
+
+  it("credits a forward range to the rows it came from, not to a snapshot that did not give it", () => {
+    const rounds = dayOfRounds(DATE, 200001).map((r, i) => (i === 0 ? { ...r, source_host: "scan.sv-1.global.canton.network.example.invalid" } : r));
+    // A snapshot of the day stored without its last round: the range still comes from the rounds.
+    const snapshot = { ...snapshotRow(DATE, 200140), last_round: null, source_host: "scan.sv-2.global.canton.network.example.invalid" };
+    const r = computeDay(inputs({ snapshot, roundsInRange: rounds, startedInDay: rounds, range: resolveRange(snapshot, null, rounds) }));
+    expect(r.series.first_round.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+    expect(r.series.last_round.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+    expect(r.series.rounds.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+  });
+
+  it("credits first_round and rounds to both snapshots they are built from, and last_round to the day's own", () => {
+    const base = inputs();
+    const r = computeDay({ ...base, prevSnapshot: { ...(base.prevSnapshot as NonNullable<DayInputs["prevSnapshot"]>), source_host: "scan.sv-1.global.canton.network.example.invalid" } });
+    expect(r.series.last_round.source_host).toBe(HOST);
+    expect(r.series.first_round.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+    expect(r.series.rounds.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+  });
+
+  it("names one host when one served them all", () => {
+    expect(computeDay(inputs()).series.app_rewards_cc.source_host).toBe(HOST);
+  });
+
+  it("names both readings' hosts on the net supply change", () => {
+    const r = computeDay(inputs({ prevSupply: { value: SUPPLY_START, source_host: "scan.sv-1.global.canton.network.example.invalid" } }));
+    expect(r.series.net_supply_change_cc.source_host).toBe(`${HOST}, scan.sv-1.global.canton.network.example.invalid`);
+    expect(r.series.supply_cc.source_host).toBe(HOST);
+  });
+});
+
 describe("computeDay on a complete forward day", () => {
   const r = computeDay(inputs());
 

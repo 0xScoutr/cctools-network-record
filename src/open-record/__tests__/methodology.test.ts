@@ -45,10 +45,42 @@ describe("methodology.json, the Methodology page content source", () => {
     expect(text).not.toMatch(/publicly observable(?! by)/);
   });
 
+  describe("once the files name another host", () => {
+    const rendered = (hosts: string[]) => renderMethodology(buildModel(fullDay("2026-10-05"), [], []), hosts, "g1");
+    const SV = "scan.sv-2.global.canton.network.digitalasset.com";
+    const both = rendered(["api.cantonnodes.com", SV]);
+
+    it("changes nothing while they name only api.cantonnodes.com", () => {
+      const only = rendered(["api.cantonnodes.com"]);
+      expect(JSON.stringify(JSON.parse(only))).toBe(text);
+      expect(only).toContain("When two Super Validator scans are available, each day's snapshot series will be read from both and compared.");
+      expect(only).toContain(LICENSE_SCOPE);
+    });
+
+    it("drops what stopped being true, and says how a value's host can change", () => {
+      expect(both).not.toContain("single operator");
+      expect(both).not.toContain("Single operator");
+      expect(both).not.toContain("will be read from both");
+      expect(both).not.toContain("served publicly");
+      expect(both).toContain("No value is cross-checked against a second operator");
+      expect(both).toContain("goes on to the next");
+      expect(both).toContain("recorded on every value");
+    });
+
+    it("says the same with only a Super Validator named", () => {
+      const one = rendered([SV]);
+      expect(one).not.toContain("single operator");
+      expect(one).toContain("No value is cross-checked against a second operator");
+      expect(one).not.toContain("goes on to the next");
+    });
+  });
+
   it("names the operator, says it publishes no terms, and scopes the license to the derived aggregates", () => {
     const sources = doc.sections.find((s: { id: string }) => s.id === "sources");
     expect(JSON.stringify(sources)).toContain("Proof Group");
     expect(JSON.stringify(sources)).toContain("no published terms of service or data license");
+    // A third party's own facts carry the day they were read, since its site can change (flip review round 2, 04/11).
+    expect(JSON.stringify(sources)).toContain("its site, read on 2026-09-25, describes a commercial service whose free tier is rate limited");
     const downloads = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "downloads"));
     expect(downloads).toContain(LICENSE_SCOPE);
     expect(downloads).toContain(TRADEMARK_NOTICE);

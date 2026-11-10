@@ -1,5 +1,6 @@
+import { recordSourceHosts } from "../render";
 import { describe, expect, it } from "vitest";
-import { DAILY_COLUMNS, LICENSE_SCOPE, RECORD_FIRST_DATE, SERIES, addDays } from "../contract";
+import { DAILY_COLUMNS, LICENSE_SCOPE, LICENSE_SCOPE_ANY_HOST, RECORD_FIRST_DATE, SERIES, addDays } from "../contract";
 import {
   buildModel,
   csvCell,
@@ -25,6 +26,31 @@ const model = () =>
     [gapRow(D2, "app_rewards_cc", { status: "open" }), gapRow(D0, "supply_cc", { resolved_at: "2026-10-02T02:35:00+00:00", status: "resolved" })],
     [revisionRow(D0, "validator_licenses", "2026-10-01T00:00:00+00:00"), revisionRow(D0, "app_rewards_cc", "2026-10-20T10:00:00+00:00")],
   );
+
+describe("daily.json's license words", () => {
+  const day = fullDay(D0);
+  it("stay as published while the record names only api.cantonnodes.com", () => {
+    const doc = JSON.parse(renderDailyJson(buildModel(day, [], []), "g1").body);
+    expect(doc.license_scope).toBe(LICENSE_SCOPE);
+  });
+
+  it("change once a value names another host", () => {
+    const doc = JSON.parse(renderDailyJson(buildModel(day.map((r) => ({ ...r, source_host: "scan.sv-2.global.canton.network.digitalasset.com" })), [], []), "g1").body);
+    expect(doc.license_scope).toBe(LICENSE_SCOPE_ANY_HOST);
+  });
+});
+
+describe("recordSourceHosts", () => {
+  it("lists each host once, also when one value names two", () => {
+    const row = (source_host: string | null, value: string | null = "1") => ({ value, source_host }) as never;
+    const model = {
+      values: new Map([
+        ["2026-11-07", new Map([["a", row("api.cantonnodes.com")], ["b", row("scan.sv-1.example, api.cantonnodes.com")], ["c", row("gone.example", null)]])],
+      ]),
+    } as never;
+    expect(recordSourceHosts(model)).toEqual(["api.cantonnodes.com", "scan.sv-1.example"]);
+  });
+});
 
 describe("csv primitives", () => {
   it("quotes only what RFC 4180 requires", () => {

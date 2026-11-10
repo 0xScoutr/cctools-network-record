@@ -21,6 +21,7 @@ import {
   type ReasonCode,
   type RecordMethod,
   type SeriesName,
+  SOURCE_HOST_SEPARATOR,
 } from "../open-record/contract";
 import { ROUND_TOTALS_SERIES, type RoundTotalsVerification } from "./config";
 import { add, dec, format, type Dec } from "./decimal";
@@ -158,6 +159,15 @@ export function licensesNotReadReason(date: string): string {
   );
 }
 
+/**
+ * Every host a value was read from, sorted, comma separated. Hosts fail over
+ * (scan-client.ts), so the rounds of one day can come from two of them, and a
+ * value credited to only one would say something false.
+ */
+function hostsOf(hosts: readonly string[]): string {
+  return [...new Set(hosts)].sort().join(SOURCE_HOST_SEPARATOR);
+}
+
 /** The only way a series gets a value: the host and the instant are required, never a null fallback. */
 function value(v: string, host: string, method: RecordMethod, asOf: string): ComputedSeries {
   return { value: v, method, source_host: host, as_of: asOf, hold: null, gap: null };
@@ -292,7 +302,7 @@ function flows(
   if (boundaryReason == null && absent.length === 0 && rows.length > 0 && rows.every(complete)) {
     // Both branches that publish a value have at least one row, whose
     // source_host is NOT NULL in network_record_rounds.
-    const host = rows[0].source_host;
+    const host = hostsOf(rows.map((r) => r.source_host));
     const asOf = latest(rows.map((r) => r.start_issuing_at)) ?? asOfEnd;
     let why = rangeHold;
     let code = rangeCode;
@@ -326,7 +336,7 @@ function flows(
   }
 
   if (boundaryReason == null && absent.length === 0 && rows.length > 0 && verifiedTotals.length > 0 && rows.every(fromTotals)) {
-    const host = rows[0].source_host;
+    const host = hostsOf(rows.map((r) => r.source_host));
     const asOf = latest(rows.map((r) => r.closed_at)) ?? asOfEnd;
     for (const k of ROUND_TOTALS_SERIES) {
       if (!inp.roundTotalsVerified[k]) {
@@ -381,7 +391,11 @@ export function computeDay(inp: DayInputs): { series: Record<SeriesName, Compute
     // The boundary's source: the snapshot that read it, else the captured
     // rounds that gave it. With neither there is no host to publish the counts
     // under, so they are a gap, never a value with a null host.
-    const host = inp.snapshot?.source_host ?? inp.startedInDay[0]?.source_host ?? inp.roundsInRange[0]?.source_host ?? null;
+    const rowHosts = inp.startedInDay.length > 0 ? inp.startedInDay : inp.roundsInRange;
+    const fromRows = rowHosts.length > 0 ? hostsOf(rowHosts.map((r) => r.source_host)) : null;
+    const host = inp.range.source === "snapshot" ? (inp.snapshot?.source_host ?? fromRows) : (fromRows ?? inp.snapshot?.source_host ?? null);
+    // first_round and rounds also rest on the previous day's snapshot when the range came from the two snapshots.
+    const spanHost = host !== null && inp.range.source === "snapshot" && inp.prevSnapshot ? hostsOf([host, inp.prevSnapshot.source_host]) : host;
     const prevLastText = inp.prevValues.last_round;
     const prevLast = prevLastText != null ? Math.round(Number(prevLastText)) : null;
     // A forward range edge nothing confirms: the day may include the named
@@ -437,7 +451,7 @@ export function computeDay(inp: DayInputs): { series: Record<SeriesName, Compute
         out[name] = boundary;
         continue;
       }
-      const c = value(String(n), host, METHOD_SCAN, asOfEnd);
+      const c = value(String(n), name === "last_round" ? host : (spanHost as string), METHOD_SCAN, asOfEnd);
       out[name] = why ? held(c, why, code) : c;
     }
     Object.assign(out, flows(inp, inp.range, why, code, forwardDay, asOfEnd, boundaryReason));
@@ -505,7 +519,7 @@ export function computeDay(inp: DayInputs): { series: Record<SeriesName, Compute
   const prevDate = addDays(inp.date, -1);
   if (inp.supply && inp.prevSupply) {
     const net = dec(inp.supply.value) - dec(inp.prevSupply.value);
-    const c = value(format(net), inp.supply.source_host, METHOD_SCAN, asOfEnd);
+    const c = value(format(net), hostsOf([inp.supply.source_host, inp.prevSupply.source_host]), METHOD_SCAN, asOfEnd);
     const supplyHold = out.supply_cc?.hold ?? null;
     out.net_supply_change_cc = supplyHold ? held(c, supplyHold) : c;
     // Observations only: why supply moved is not known until a later check

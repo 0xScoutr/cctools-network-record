@@ -16,11 +16,12 @@ import {
   DAILY_COLUMNS,
   GAPS_COLUMNS,
   LICENSE,
-  LICENSE_SCOPE,
+  licenseScopeFor,
   RECORD_FIRST_DATE,
   RECORD_RELEASE_AT,
   REVISIONS_COLUMNS,
   SCHEMA_VERSION,
+  SOURCE_HOST_SEPARATOR,
   SERIES_NAMES,
   VALUES_COLUMNS,
   addDays,
@@ -210,10 +211,18 @@ export function buildModel(values: ValueRow[], gaps: GapRow[], revisions: Revisi
  */
 export function recordSourceHosts(model: RecordModel): string[] {
   const hosts = new Set<string>();
-  for (const day of model.values.values()) {
-    for (const v of day.values()) if (v.value != null && v.source_host) hosts.add(v.source_host);
-  }
+  for (const day of model.values.values()) for (const host of valueHosts(day.values())) hosts.add(host);
   return [...hosts].sort();
+}
+
+/** The hosts these values name: only of published values, and each host of a value that names two. */
+export function valueHosts(values: Iterable<ValueRow>): string[] {
+  const hosts = new Set<string>();
+  for (const v of values) {
+    if (v.value == null || !v.source_host) continue;
+    for (const host of v.source_host.split(SOURCE_HOST_SEPARATOR)) hosts.add(host);
+  }
+  return [...hosts];
 }
 
 /**
@@ -277,7 +286,7 @@ export function renderDailyJson(model: RecordModel, generationId: string): Rende
       schema_version: SCHEMA_VERSION,
       generation_id: generationId,
       license: LICENSE,
-      license_scope: LICENSE_SCOPE,
+      license_scope: licenseScopeFor(recordSourceHosts(model)),
       attribution: ATTRIBUTION,
       source_hosts: recordSourceHosts(model),
       columns: DAILY_COLUMNS,

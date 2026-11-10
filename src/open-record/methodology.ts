@@ -10,7 +10,8 @@ import {
   FRESHNESS,
   FRESHNESS_COMMITTED,
   LICENSE,
-  LICENSE_SCOPE,
+  licenseScopeFor,
+  namesOnlyMirror,
   METHOD_SCAN,
   OPEN_BASE_URL,
   REASON_CODES,
@@ -30,7 +31,13 @@ import { toJson, type RecordModel } from "./render";
  */
 const HOST_OPERATORS: Record<string, string> = {
   "api.cantonnodes.com":
-    "Canton Nodes, powered by Proof Group, a Super Validator; a commercial service whose free tier is rate limited, with no published terms of service or data license",
+    "Canton Nodes, powered by Proof Group, a Super Validator; its site, read on 2026-09-25, describes a commercial service whose free tier is rate limited, with no published terms of service or data license",
+  "scan.sv-1.global.canton.network.sync.global": "the Scan of the Super Validator named Global-Synchronizer-Foundation",
+  "scan.sv-1.global.canton.network.digitalasset.com": "the Scan of the Super Validator named Digital-Asset-1",
+  "scan.sv-2.global.canton.network.digitalasset.com": "the Scan of the Super Validator named Digital-Asset-2",
+  "scan.sv-1.global.canton.network.cumberland.io": "the Scan of the Super Validator named Cumberland-1",
+  "scan.sv-2.global.canton.network.cumberland.io": "the Scan of the Super Validator named Cumberland-2",
+  "scan.sv-1.global.canton.network.proofgroup.xyz": "the Scan of the Super Validator named Proof-Group-1",
 };
 
 /** The host the collector reads by default, named before any value is stored. */
@@ -112,6 +119,8 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
   // One list for the host names and their operators, so a host is never named without its operator.
   const hostList = sourceHosts.length > 0 ? sourceHosts : [DEFAULT_SOURCE_HOST];
   const freshness = FRESHNESS_COMMITTED ? "commitment" : "target";
+  // While the files name only api.cantonnodes.com, this one stays byte for byte as published (contract.ts LICENSE_SCOPE).
+  const mirror = namesOnlyMirror(hostList);
   const sections: MethodologySection[] = [
     {
       id: "rules",
@@ -142,9 +151,20 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
       id: "sources",
       title: "Sources",
       paragraphs: [
-        `Canton Scan (the Splice Scan API that Super Validators serve), read through ${hostList.join(", ")}. This is a single operator until a second Super Validator source is added; the host is recorded on every value.`,
+        `Canton Scan (the Splice Scan API that Super Validators serve), read through ${hostList.join(", ")}. ${
+          mirror
+            ? "This is a single operator until a second Super Validator source is added; the host is recorded on every value."
+            : "The host that served a read is recorded on every value."
+        }`,
+        ...(hostList.length > 1
+          ? ["A read asks one of these hosts at a time, and goes on to the next when that host refuses, fails or does not hold what was asked, so a value can name more than one host."]
+          : []),
         ...hostList.filter((h) => HOST_OPERATORS[h]).map((h) => `${h}: ${HOST_OPERATORS[h]}.`),
-        "Scan data is observable by any onboarded validator through Scan, and publicly through third-party Scan proxies. When two Super Validator scans are available, each day's snapshot series will be read from both and compared.",
+        `Scan data is observable by any onboarded validator through Scan, and publicly through third-party Scan proxies. ${
+          mirror
+            ? "When two Super Validator scans are available, each day's snapshot series will be read from both and compared."
+            : "No value is cross-checked against a second operator."
+        }`,
         "Loop Data and market price providers are not sources of the record.",
       ],
     },
@@ -185,7 +205,7 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
         `Files: ${STATIC_FILES.filter((p) => p !== "methodology.json").map((p) => `${OPEN_BASE_URL}${p}`).join(", ")}, one file per day at ${OPEN_BASE_URL}days/YYYY-MM-DD.json, and ${OPEN_BASE_URL}status.json. No key, no cookie.`,
         `Schema ${SCHEMA_VERSION}. An added column is a minor version on the same path; a rename, removal or change of unit is a new major version at /v2/, and /v1/ keeps serving for at least six months.`,
         `Data and this text: ${LICENSE.title} (${LICENSE.path}). Attribution: ${ATTRIBUTION}.`,
-        LICENSE_SCOPE,
+        licenseScopeFor(hostList),
         "These daily files are permanently free and keyless. Paid products are sold on freshness, granularity and support, never on access to the daily facts.",
         "Please cache: the files change at most hourly. Intraday and per-round data are in the keyed API.",
         TRADEMARK_NOTICE,
@@ -216,7 +236,7 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
         "Issuance is what the rounds schedule, not minted supply: unclaimed rewards are not minted and some shares are minted only when claimed, so net supply change can be negative or larger than a day's issuance.",
         "Burn is not in schema 1.0.0; it arrives as a new column when measured. Transaction counts stay out of the record: counting all synchronizer transactions depends on Mediator metadata (see What each series depends on).",
         "Reward coupon totals start with the forward collector: the round-totals archive does not carry them, so earlier days are empty (not collected) until the update-stream backfill. A coupon total is a sum of coupon amounts, not a count of apps, validators or transactions.",
-        "Single operator until a second Super Validator source is added. App rewards and app reward coupons change method when the network switches reward versions (CIP-104).",
+        `${mirror ? "Single operator until a second Super Validator source is added." : "No value is cross-checked against a second operator."} App rewards and app reward coupons change method when the network switches reward versions (CIP-104).`,
       ],
     },
     {

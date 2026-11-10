@@ -8,7 +8,7 @@
 import {
   ATTRIBUTION,
   LICENSE,
-  LICENSE_SCOPE,
+  licenseScopeFor,
   OPEN_BASE_URL,
   RECORD_RELEASE_LABEL,
   SCHEMA_VERSION,
@@ -20,7 +20,7 @@ import {
   type GapRow,
   type SeriesName,
 } from "./contract";
-import { dayRevision, dayStatus, isoZ, publishedProvenance, publishedValue, revisionOf, toJson, type RecordModel } from "./render";
+import { dayRevision, dayStatus, isoZ, publishedProvenance, publishedValue, revisionOf, toJson, valueHosts, type RecordModel } from "./render";
 
 const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -195,7 +195,7 @@ export function renderDayFile(model: RecordModel, date: string, generationId: st
     notes: dayNotes(model, date),
     citation: citationFor(date, rev.revision, asOf),
     license: LICENSE,
-    license_scope: LICENSE_SCOPE,
+    license_scope: licenseScopeFor(valueHosts(day?.values() ?? [])),
     attribution: ATTRIBUTION,
     links: {
       daily_csv: `${OPEN_BASE_URL}daily.csv`,

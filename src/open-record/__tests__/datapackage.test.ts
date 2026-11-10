@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { DAILY_COLUMNS, LICENSE_SCOPE, SERIES, TRADEMARK_NOTICE } from "../contract";
+import { DAILY_COLUMNS, LICENSE_SCOPE, LICENSE_SCOPE_ANY_HOST, SERIES, TRADEMARK_NOTICE } from "../contract";
 import { renderDatapackage } from "../datapackage";
+
+describe("what the package says about its source", () => {
+  it("stays as published while it names only api.cantonnodes.com", () => {
+    const text = renderDatapackage(["api.cantonnodes.com"], "g1");
+    expect(text).toContain("derived from Scan data served publicly by a Super Validator:");
+    expect(text).toContain('"description": "Scan host the value was read from."');
+    expect(JSON.parse(text).rights).toBe(LICENSE_SCOPE);
+  });
+
+  it("says nothing the allowlist makes false once it names another host", () => {
+    const text = renderDatapackage(["api.cantonnodes.com", "scan.sv-2.global.canton.network.digitalasset.com"], "g1");
+    expect(text).not.toContain("served publicly");
+    expect(text).toContain("comma separated");
+    expect(JSON.parse(text).rights).toBe(LICENSE_SCOPE_ANY_HOST);
+  });
+});
 
 describe("datapackage.json (Frictionless Data Package v2)", () => {
   const doc = JSON.parse(renderDatapackage(["api.cantonnodes.com"], "g1"));
@@ -17,6 +33,7 @@ describe("datapackage.json (Frictionless Data Package v2)", () => {
     expect(doc.rights).toBe(LICENSE_SCOPE);
     expect(doc.sources[0].title).toContain("Proof Group");
     expect(doc.sources[0].title).toContain("no published terms of service or data license");
+    expect(doc.sources[0].title).toContain("read on 2026-09-25");
     expect(doc.trademark_notice).toBe(TRADEMARK_NOTICE);
   });
 

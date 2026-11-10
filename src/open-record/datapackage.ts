@@ -5,7 +5,7 @@
  * timestamp of its own, so it changes only with the schema or the sources.
  */
 
-import { LICENSE, LICENSE_SCOPE, SCHEMA_VERSION, SERIES, SITE_RECORD_URL, TRADEMARK_NOTICE } from "./contract";
+import { LICENSE, SCHEMA_VERSION, SERIES, SITE_RECORD_URL, TRADEMARK_NOTICE, licenseScopeFor, namesOnlyMirror } from "./contract";
 import { hostSourceTitle } from "./methodology";
 import { toJson } from "./render";
 
@@ -20,18 +20,20 @@ const seriesFields = (): Field[] =>
 
 export function renderDatapackage(sourceHosts: string[], generationId: string): string {
   const csv = { format: "csv", mediatype: "text/csv", encoding: "utf-8" };
+  // While it names only api.cantonnodes.com, this file stays byte for byte as published (contract.ts LICENSE_SCOPE).
+  const mirror = namesOnlyMirror(sourceHosts);
   return toJson({
     $schema: "https://datapackage.org/profiles/2.0/datapackage.json",
     name: "cctools-canton-network-daily-record",
     title: "CCTools daily record of the Canton Network",
     description:
-      `One row per UTC day of Canton Network state, derived from Scan data served publicly by a Super Validator: rounds, issuance by category, supply, the SV reference price, Super Validators, featured apps and validator licenses. Every missing value has a reason in gaps.csv and every change after a value became final is in revisions.csv. ${LICENSE_SCOPE}`,
+      `One row per UTC day of Canton Network state, derived from ${mirror ? "Scan data served publicly by a Super Validator" : "Canton Scan data"}: rounds, issuance by category, supply, the SV reference price, Super Validators, featured apps and validator licenses. Every missing value has a reason in gaps.csv and every change after a value became final is in revisions.csv. ${licenseScopeFor(sourceHosts)}`,
     version: SCHEMA_VERSION,
     generation_id: generationId,
     homepage: SITE_RECORD_URL,
     licenses: [LICENSE],
     // Custom properties (allowed by the standard): what the license covers, and the trademark notice.
-    rights: LICENSE_SCOPE,
+    rights: licenseScopeFor(sourceHosts),
     trademark_notice: TRADEMARK_NOTICE,
     sources: sourceHosts.map((h) => ({ title: hostSourceTitle(h), path: `https://${h}` })),
     resources: [
@@ -58,7 +60,7 @@ export function renderDatapackage(sourceHosts: string[], generationId: string): 
             f("series", "string", "Column name in daily.csv."),
             f("value", "number", "The value; empty when not recorded (reason in gaps.csv)."),
             f("status", "string", "final or provisional."),
-            f("source_host", "string", "Scan host the value was read from."),
+            f("source_host", "string", mirror ? "Scan host the value was read from." : "Scan host the value was read from; two or more, comma separated, when the rounds of a day came from different hosts."),
             f("method", "string", "Method version (scan-1, scan-rt-1)."),
             f("as_of", "datetime", "Time the value describes."),
             f("revision", "integer", "Published revisions of this value since release."),
