@@ -165,11 +165,18 @@ describe("methodology.json, the Methodology page content source", () => {
     expect(revisions).toContain("A recomputation that gives the same value is not a revision");
   });
 
-  it("states the earlier table's defects instead of hiding them", () => {
+  it("states the earlier table's defects instead of hiding them, never their internal causes", () => {
     const before = JSON.stringify(doc.sections.find((s: { id: string }) => s.id === "before-the-record"));
     for (const d of ["2026-03-28", "2026-03-29", "2026-04-14", "2026-06-18", "2026-08-14"]) expect(before).toContain(d);
-    expect(before).toContain("401");
-    expect(before).toContain("429");
+    expect(before).toContain("frozen at one value from mid-August 2026");
+    expect(before).toContain("In September 2026 several of its values are empty.");
+    expect(before).not.toMatch(/401|429|missing column/);
+  });
+
+  it("says what an empty final value needs, and nothing of the alerts behind the jobs", () => {
+    const gaps = doc.sections.find((s: { id: string }) => s.id === "gaps").paragraphs;
+    expect(gaps).toEqual(["Every empty value in a final row joins a reason in gaps.csv, or the day stays provisional."]);
+    expect(text).not.toMatch(/alert/i);
   });
 
   it("names Loop Data, formerly Lighthouse, by Five North at its first mention, and Loop Data after that", () => {

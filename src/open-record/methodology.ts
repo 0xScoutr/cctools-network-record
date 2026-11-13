@@ -48,7 +48,10 @@ export function hostSourceTitle(host: string): string {
   return `Canton Scan (Splice Scan API) served by ${host}${operator ? ` (${operator})` : ""}`;
 }
 
-/** Legacy defects, stated once so the history is not hidden. SQL 2026-09-25. */
+/**
+ * Legacy defects, stated once so the history is not hidden. SQL 2026-09-25. Each defect is stated, never its internal
+ * cause: the page says what a reader needs, and why a write failed is not that.
+ */
 const LEGACY_MISSING_DATES = ["2026-03-28", "2026-03-29", "2026-04-14", "2026-06-18", "2026-08-14"];
 
 const SOURCE: Record<SeriesName, string> = {
@@ -185,7 +188,7 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
     {
       id: "gaps",
       title: "Gaps",
-      paragraphs: ["Every empty value in a final row joins a reason in gaps.csv, or the day stays provisional and an alert fires."],
+      paragraphs: ["Every empty value in a final row joins a reason in gaps.csv, or the day stays provisional."],
       table: { columns: ["reason_code", "Meaning"], rows: REASON_CODES.map((c) => [c, REASONS[c]]) },
     },
     {
@@ -245,9 +248,8 @@ export function renderMethodology(model: RecordModel, sourceHosts: string[], gen
       paragraphs: [
         "CCTools kept an earlier daily table copied from a third-party indexer (Loop Data). It is not carried into this record, and its defects are listed here so the history is not hidden:",
         `Missing dates: ${LEGACY_MISSING_DATES.join(", ")}.`,
-        "On 2026-08-14 a missing column stopped the daily write, which is why that date is absent.",
         "Its supply figure stayed frozen at one value from mid-August 2026, about 5% below the registry supply.",
-        "In September 2026 several values are empty because the indexer answered 401 or 429 on those days.",
+        "In September 2026 several of its values are empty.",
       ],
     },
   ];
