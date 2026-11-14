@@ -14,7 +14,7 @@
     "src/open-record/__tests__/datapackage.test.ts": "d4b16ad0631c3c8bf4e3017d6471d847ddae27816a4d14f465aa718c3c8d324a",
     "src/open-record/__tests__/day-file.test.ts": "7d2ed63439ac6b73a55fcf230003327d8fa037a1b8d77eadc19b4580c47f3164",
     "src/open-record/__tests__/helpers/rows.ts": "62300cbfc843b7f0e19744c6ad4fda56fa81c74da73b85ddc6eaa5710a13a1ec",
-    "src/open-record/__tests__/methodology.test.ts": "644039ed7e871cc2cc9db390b3dd2d1ea830178279f83b9ae0a425a1f6657ed7",
+    "src/open-record/__tests__/methodology.test.ts": "8fe0a529ad696475a77842346ee047bcd723f46bebfafbeddc4c6d7485487b8a",
     "src/open-record/__tests__/migration-contract.test.ts": "5b44ce096a71439db2d52662b2e3499c6a57745d823230ae2b47d7683b89261c",
     "src/open-record/__tests__/publish.test.ts": "785e5c8997811cf7181ef8e3855af376ea57c9bff4700c1aee111205e461f72b",
     "src/open-record/__tests__/render.test.ts": "4d7d6ca7300605d3152ebceefb58ce9499f41b54936e149c72fff1de0694ab05",
