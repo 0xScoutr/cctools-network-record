@@ -49,8 +49,7 @@ export function hostSourceTitle(host: string): string {
 }
 
 /**
- * Legacy defects, stated once so the history is not hidden. SQL 2026-09-25. Each defect is stated, never its internal
- * cause: the page says what a reader needs, and why a write failed is not that.
+ * Legacy defects, stated once so the history is not hidden. SQL 2026-09-25. Each defect is stated, not its cause.
  */
 const LEGACY_MISSING_DATES = ["2026-03-28", "2026-03-29", "2026-04-14", "2026-06-18", "2026-08-14"];
 

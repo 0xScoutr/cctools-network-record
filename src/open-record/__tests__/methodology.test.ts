@@ -170,7 +170,7 @@ describe("methodology.json, the Methodology page content source", () => {
     for (const d of ["2026-03-28", "2026-03-29", "2026-04-14", "2026-06-18", "2026-08-14"]) expect(before).toContain(d);
     expect(before).toContain("frozen at one value from mid-August 2026");
     expect(before).toContain("In September 2026 several of its values are empty.");
-    expect(before).not.toMatch(/401|429|missing column/);
+    expect(before).not.toMatch(/401|429|missing column/);
   });
 
   it("says what an empty final value needs, and nothing of the alerts behind the jobs", () => {
